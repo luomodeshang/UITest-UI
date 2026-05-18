@@ -989,43 +989,37 @@ function stepTimePreprocess() {
     return;
   }
   
-  // 检测整数时间戳列（值 > 1e8 的列）
-  const timeCols = [];
-  columns.forEach((col, ci) => {
-    const vals = rowData.map(r => r.values[ci]).filter(v => v !== null && v !== undefined);
-    if (vals.length > 0) {
-      const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
-      if (avg > 1e8 && avg < 2e12) {
-        timeCols.push(ci);
-      }
-    }
-  });
-  
-  if (timeCols.length === 0) {
-    alert('未检测到时间戳列（未找到值在1e8~2e12范围的列），跳过此步骤');
+  // 只处理第一列 (Col_00)，检测是否为时间戳
+  const ci = 0;
+  const vals = rowData.map(r => r.values[ci]).filter(v => v !== null && v !== undefined);
+  if (vals.length === 0) {
+    alert('第一列无数据，无法处理');
+    return;
+  }
+  const avg = vals.reduce((a, b) => a + b, 0) / vals.length;
+  if (avg < 1e8 || avg > 2e12) {
+    alert('第一列不是时间戳数据（平均值范围应为1e8~2e12），跳过此步骤');
     STEP_FLAGS.timePreprocessed = true;
     checkExportReady();
     return;
   }
   
   // 转换：整数时间戳 → 格式化日期字符串
-  timeCols.forEach(ci => {
-    columns[ci] = columns[ci] + ' (时间)';
-    rowData.forEach(row => {
-      const val = row.values[ci];
-      if (val === null || val === undefined) return;
-      const ts = val > 1e12 ? Math.floor(val / 1000) : Math.floor(val);
-      const d = new Date(ts * 1000);
-      if (!isNaN(d.getTime())) {
-        const fmt = d.getFullYear() + '-' +
-          String(d.getMonth()+1).padStart(2,'0') + '-' +
-          String(d.getDate()).padStart(2,'0') + ' ' +
-          String(d.getHours()).padStart(2,'0') + ':' +
-          String(d.getMinutes()).padStart(2,'0') + ':' +
-          String(d.getSeconds()).padStart(2,'0');
-        row.values[ci] = fmt;
-      }
-    });
+  columns[ci] = columns[ci] + ' (时间)';
+  rowData.forEach(row => {
+    const val = row.values[ci];
+    if (val === null || val === undefined) return;
+    const ts = val > 1e12 ? Math.floor(val / 1000) : Math.floor(val);
+    const d = new Date(ts * 1000);
+    if (!isNaN(d.getTime())) {
+      const fmt = d.getFullYear() + '-' +
+        String(d.getMonth()+1).padStart(2,'0') + '-' +
+        String(d.getDate()).padStart(2,'0') + ' ' +
+        String(d.getHours()).padStart(2,'0') + ':' +
+        String(d.getMinutes()).padStart(2,'0') + ':' +
+        String(d.getSeconds()).padStart(2,'0');
+      row.values[ci] = fmt;
+    }
   });
   
   STEP_FLAGS.timePreprocessed = true;
@@ -1048,36 +1042,30 @@ function stepNormalize() {
     return;
   }
   
-  // 检测数值列不同量级
-  const numericCols = [];
-  columns.forEach((col, ci) => {
-    const vals = rowData.map(r => r.values[ci]).filter(v => typeof v === 'number' && !isNaN(v));
-    if (vals.length > 0) {
-      const min = Math.min(...vals);
-      const max = Math.max(...vals);
-      const range = max - min;
-      if (range > 0) {
-        numericCols.push({ idx: ci, min, max, range, name: col });
-      }
-    }
-  });
-  
-  if (numericCols.length === 0) {
-    alert('未检测到可归一化的数值列');
-    STEP_FLAGS.normalized = true;
-    checkExportReady();
-    return;
-  }
-  
-  // 执行 Min-Max 归一化到 [0,1]
+  // 选择两列相邻数据列：Col_02 和 Col_03（示例展示不同量级归一化）
+  const normCols = [2, 3];
   let infoText = '归一化处理:\n';
-  numericCols.forEach(({ idx, min, max, range, name }) => {
-    columns[idx] = name + ' (归一化)';
+  
+  normCols.forEach(ci => {
+    const name = columns[ci];
+    const vals = rowData.map(r => r.values[ci]).filter(v => typeof v === 'number' && !isNaN(v));
+    if (vals.length === 0) {
+      infoText += name + ': 无有效数值，跳过\n';
+      return;
+    }
+    const min = Math.min(...vals);
+    const max = Math.max(...vals);
+    const range = max - min;
+    if (range === 0) {
+      infoText += name + ': 所有值相同，跳过\n';
+      return;
+    }
+    columns[ci] = name + ' (归一化)';
     infoText += name + ': [' + min.toFixed(2) + ' ~ ' + max.toFixed(2) + '] → [0, 1]\n';
     rowData.forEach(row => {
-      const v = row.values[idx];
+      const v = row.values[ci];
       if (typeof v === 'number' && !isNaN(v)) {
-        row.values[idx] = parseFloat(((v - min) / range).toFixed(6));
+        row.values[ci] = parseFloat(((v - min) / range).toFixed(6));
       }
     });
   });
@@ -1089,7 +1077,7 @@ function stepNormalize() {
   document.querySelectorAll('.btn-normal').forEach(b => b.classList.remove('active'));
   document.getElementById('btnNorm').classList.add('active');
   
-  document.getElementById('tableInfo').textContent += ' | 📐 已归一化';
+  document.getElementById('tableInfo').textContent += ' | 📐 已归一化 (两列)';
   console.log(infoText);
 }
 
