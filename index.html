@@ -500,11 +500,11 @@ function startScroll() {
   
   const wrapper = document.getElementById('tableWrapper');
   scrollTimer = setInterval(() => {
-    wrapper.scrollTop += 1;
+    wrapper.scrollTop += 3;
     if (wrapper.scrollTop >= wrapper.scrollHeight - wrapper.clientHeight) {
       wrapper.scrollTop = 0;
     }
-  }, 30); // ~30行/秒 平滑滚动
+  }, 15); // 更快滚动
 }
 
 function stopScroll() {
@@ -1073,6 +1073,16 @@ function stepNormalize() {
   STEP_FLAGS.normalized = true;
   renderTable();
   checkExportReady();
+  
+  // 表格滚动到最左侧，显示 Col_02 和 Col_03 归一化列
+  const wrapper = document.getElementById('tableWrapper');
+  if (wrapper) {
+    const headerCells = document.querySelectorAll('#dataTable thead th');
+    // th[0]=行号, th[1]=Col_00, th[2]=Col_01, th[3]=Col_02(归一化)
+    if (headerCells.length >= 4) {
+      wrapper.scrollLeft = headerCells[2].offsetLeft - 20;
+    }
+  }
   
   document.querySelectorAll('.btn-normal').forEach(b => b.classList.remove('active'));
   document.getElementById('btnNorm').classList.add('active');
