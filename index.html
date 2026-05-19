@@ -270,16 +270,18 @@ tr.duplicate-row:hover td { background:rgba(245,158,11,0.2); }
   <header class="top-bar">
     <div class="top-bar__brand">
       <svg class="top-bar__icon" viewBox="0 0 30 38" width="28" height="36" fill="none">
-        <!-- B + K 共用左侧竖线（等长重合） -->
+        <!-- B 左侧竖线（长） -->
         <path d="M6 5v28" stroke="#00d4ff" stroke-width="4.5" stroke-linecap="round"/>
-        <!-- B 上弧线：从竖线出发向右绕回竖线中部 -->
+        <!-- B 上弧线 -->
         <path d="M6 10c7-7 16-3 16 4s-8 7-16 5" stroke="#00d4ff" stroke-width="4" fill="none" stroke-linecap="round"/>
-        <!-- B 下弧线：从竖线出发向右绕回竖线中部 -->
+        <!-- B 下弧线 -->
         <path d="M6 28c7 6 16 3 16-4s-8-7-16-5" stroke="#00d4ff" stroke-width="4" fill="none" stroke-linecap="round"/>
-        <!-- K 上斜线：从两弧交点出发向右上方 -->
-        <path d="M6 20l11-11" stroke="#00d4ff" stroke-width="4" stroke-linecap="round"/>
-        <!-- K 下斜线：从两弧交点出发向右下方 -->
-        <path d="M6 20l11 11" stroke="#00d4ff" stroke-width="4" stroke-linecap="round"/>
+        <!-- K 左侧竖线（短，上下比B短3） -->
+        <path d="M7 8v22" stroke="#00d4ff" stroke-width="4" stroke-linecap="round"/>
+        <!-- K 上斜线（起点右移，终点外扩） -->
+        <path d="M10 19l13-11" stroke="#00d4ff" stroke-width="3.5" stroke-linecap="round"/>
+        <!-- K 下斜线（起点右移，终点外扩） -->
+        <path d="M10 19l13 11" stroke="#00d4ff" stroke-width="3.5" stroke-linecap="round"/>
       </svg>
       <span class="top-bar__title">BroadTech System</span>
     </div>
