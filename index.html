@@ -25,18 +25,18 @@ body {
 /* ===== 顶部栏 ===== */
 .top-bar {
   height:60px; min-height:60px;
-  display:flex; align-items:center;
+  display:flex; align-items:center; justify-content:flex-end;
   background: linear-gradient(135deg, #0f1729 0%, #1a2744 100%);
   border-bottom:1px solid #1e3a5f;
   position:relative; z-index:10;
   padding:0 24px;
 }
 .top-bar__brand {
-  display:flex; align-items:center; gap:12px;
+  display:flex; align-items:center; gap:10px;
 }
-.top-bar__logo {
-  width:32px; height:34px; object-fit:contain;
-  filter: brightness(1.2);
+.top-bar__icon {
+  display:block;
+  filter: drop-shadow(0 0 4px rgba(0,212,255,0.5));
 }
 .top-bar__title {
   font-size:1.25rem; font-weight:600;
@@ -227,8 +227,9 @@ tr.duplicate-row:hover td { background:rgba(245,158,11,0.2); }
   background: linear-gradient(135deg, #0f1729 0%, #1a2744 100%);
   border-top:1px solid #1e3a5f;
 }
-.bottom-bar span {
-  font-size:0.85rem; color:#94a3b8;
+.bottom-bar__title {
+  font-size:1.25rem; font-weight:600;
+  color:#ffffff;
   letter-spacing:4px;
 }
 
@@ -267,7 +268,11 @@ tr.duplicate-row:hover td { background:rgba(245,158,11,0.2); }
   <!-- ===== 顶部 ===== -->
   <header class="top-bar">
     <div class="top-bar__brand">
-      <img src="assets/images/logo-icon.jpg" alt="" class="top-bar__logo">
+      <svg class="top-bar__icon" viewBox="0 0 28 28" width="28" height="28" fill="none">
+        <rect x="2" y="2" width="24" height="24" rx="6" stroke="#00d4ff" stroke-width="1.5" fill="none"/>
+        <path d="M8 14h12M14 8v12" stroke="#00d4ff" stroke-width="1.8" stroke-linecap="round"/>
+        <circle cx="14" cy="14" r="3" fill="#00d4ff" opacity="0.6"/>
+      </svg>
       <span class="top-bar__title">BroadTech System</span>
     </div>
   </header>
@@ -329,7 +334,7 @@ tr.duplicate-row:hover td { background:rgba(245,158,11,0.2); }
 
   <!-- ===== 底部 ===== -->
   <footer class="bottom-bar">
-    <span>手搓数据 智驭未来</span>
+    <span class="bottom-bar__title">手搓数据 智驭未来</span>
   </footer>
 </div>
 
