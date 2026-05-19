@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>博科 · 数据质量监控平台</title>
+<title>BroadTech System · 数据质量监控平台</title>
 <style>
 /* ===== 全局样式 ===== */
 * { margin:0; padding:0; box-sizing:border-box; }
@@ -25,24 +25,23 @@ body {
 /* ===== 顶部栏 ===== */
 .top-bar {
   height:60px; min-height:60px;
-  display:flex; align-items:center; justify-content:center;
+  display:flex; align-items:center;
   background: linear-gradient(135deg, #0f1729 0%, #1a2744 100%);
   border-bottom:1px solid #1e3a5f;
   position:relative; z-index:10;
+  padding:0 24px;
 }
-.top-bar h1 {
-  font-size:1.5rem; font-weight:700;
-  letter-spacing:8px;
-  background: linear-gradient(90deg, #00d4ff, #0088ff, #00d4ff);
-  background-size:200% auto;
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  animation: shimmer 3s ease infinite;
+.top-bar__brand {
+  display:flex; align-items:center; gap:12px;
 }
-@keyframes shimmer {
-  0% { background-position:0% center; }
-  50% { background-position:100% center; }
-  100% { background-position:0% center; }
+.top-bar__logo {
+  width:32px; height:34px; object-fit:contain;
+  filter: brightness(1.2);
+}
+.top-bar__title {
+  font-size:1.25rem; font-weight:600;
+  color:#ffffff;
+  letter-spacing:1px;
 }
 /* 顶部装饰指示灯 */
 .top-bar::after {
@@ -229,8 +228,8 @@ tr.duplicate-row:hover td { background:rgba(245,158,11,0.2); }
   border-top:1px solid #1e3a5f;
 }
 .bottom-bar span {
-  font-size:0.85rem; color:#475569;
-  letter-spacing:6px;
+  font-size:0.85rem; color:#94a3b8;
+  letter-spacing:4px;
 }
 
 /* ===== 动画 ===== */
@@ -267,7 +266,10 @@ tr.duplicate-row:hover td { background:rgba(245,158,11,0.2); }
 
   <!-- ===== 顶部 ===== -->
   <header class="top-bar">
-    <h1>博 科</h1>
+    <div class="top-bar__brand">
+      <img src="assets/images/logo-icon.jpg" alt="" class="top-bar__logo">
+      <span class="top-bar__title">BroadTech System</span>
+    </div>
   </header>
 
   <!-- ===== 中间 ===== -->
@@ -327,7 +329,7 @@ tr.duplicate-row:hover td { background:rgba(245,158,11,0.2); }
 
   <!-- ===== 底部 ===== -->
   <footer class="bottom-bar">
-    <span>博 科</span>
+    <span>手搓数据 智驭未来</span>
   </footer>
 </div>
 
