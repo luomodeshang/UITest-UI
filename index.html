@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.4</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.5</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -40,7 +40,7 @@ body { background:#0a0e17; color:#e0e8f0; font-family:'Microsoft YaHei','PingFan
 .btn-quality.active { background:rgba(6,182,212,.15); border-color:#06b6d4; color:#22d3ee; }
 .btn-miss.active { background:rgba(16,185,129,.15); border-color:#10b981; color:#34d399; }
 .btn-dup.active { background:rgba(245,158,11,.15); border-color:#f59e0b; color:#fbbf24; }
-.btn-outlier.active { background:rgba(168,85,247,.15); border-color:#a855f7; color:#c084fc; }
+.btn-outlier.active { background:rgba(225,29,72,.15); border-color:#e11d48; color:#fb7185; }
 .btn-preprocess.active { background:rgba(139,92,246,.15); border-color:#8b5cf6; color:#a78bfa; }
 .btn-noise.active { background:rgba(34,211,238,.15); border-color:#22d3ee; color:#67e8f9; }
 .btn-norm.active { background:rgba(251,191,36,.15); border-color:#fbbf24; color:#fcd34d; }
@@ -66,7 +66,9 @@ td.missing { background:rgba(16,185,129,.25) !important; color:#6ee7b7; }
 td.duplicate { background:rgba(245,158,11,.2) !important; }
 tr.duplicate-row td { background:rgba(245,158,11,.12); }
 tr.duplicate-row:hover td { background:rgba(245,158,11,.2); }
-td.outlier { background:rgba(239,68,68,.3) !important; color:#fca5a5; }
+td.hl-outlier { background:rgba(225,29,72,0.3) !important; color:#fb7185; }
+td.norm-flash { background:rgba(251,191,36,0.3) !important; color:#fcd34d; transition:background 1s ease; }
+td.outlier { background:rgba(225,29,72,.3) !important; color:#fb7185; }
 .right-panel { width:360px; min-width:360px; background:#0f1729; border-left:1px solid #1e3a5f; display:flex; flex-direction:column; padding:16px; }
 .right-panel h3 { font-size:.9rem; color:#64748b; margin-bottom:12px; text-align:center; letter-spacing:2px; border-bottom:1px solid #1e3a5f; padding-bottom:8px; }
 .chart-section { flex:1; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
@@ -128,7 +130,7 @@ td.outlier { background:rgba(239,68,68,.3) !important; color:#fca5a5; }
         <button class="btn btn-preprocess" id="btnTime" onclick="stepTimePreprocess()" disabled>⏰ 时间预处理</button>
         <button class="btn btn-miss" id="btnMiss" onclick="highlightMiss()" disabled>🟢 缺失值处理</button>
         <button class="btn btn-dup" id="btnDup" onclick="highlightDup()" disabled>🟠 重复值处理</button>
-        <button class="btn btn-outlier" id="btnOutlier" onclick="highlightOutlier()" disabled>🟣 异常值处理</button>
+        <button class="btn btn-outlier" id="btnOutlier" onclick="highlightOutlier()" disabled>🔴 异常值处理</button>
         <button class="btn btn-noise" id="btnNoise" onclick="stepNoiseFilter()" disabled>🌊 噪声滤波</button>
         <button class="btn btn-norm" id="btnNorm" onclick="stepNormalize()" disabled>📐 归一化处理</button>
         <button class="btn btn-export" id="btnExport" onclick="exportDataset()" disabled>💾 导出数据集</button>
@@ -480,6 +482,10 @@ function highlightMiss() {
 
   // ====== 第1次点击：定位到第一个缺失值 ======
   if (_missStage === 0) {
+    // 清除之前其他高亮样式（避免被异常值紫色内联覆盖）
+    $$('#dataTable tbody tr td').forEach(td => {
+      td.classList.remove('hl-outlier', 'hl-outlier-filled');
+    });
     let minRow = Infinity;
     const rows = $$('#dataTable tbody tr');
     rows.forEach((tr, idx) => {
@@ -601,14 +607,16 @@ function highlightMiss() {
 
   // ====== 第3次及以后：跳转到第一个缺失值所在列 ======
   if (_missStage >= 2) {
-    // 定位到缺失值所在列居中
+    // 定位到缺失值所在列居中（用getColIndex获取真实索引）
+    const firstMissRow = Math.min(...missingPos.map(p => p[0]));
+    const firstMissCol = missingPos.filter(p => p[0] === firstMissRow).map(p => p[1])[0];
     const headers = $$('#dataTable thead th');
-    const ci = KEY_COLS[0]; // 第一个关键列（vibration_X）
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i].textContent.includes(currentHeaders[ci])) {
-        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
-        break;
-      }
+    let ci = firstMissCol;
+    if (ci === undefined || ci < 0) {
+      ci = getColIndex(KEY_COLS[0]);
+    }
+    if (ci >= 0 && ci < headers.length) {
+      _wrapper.scrollLeft = Math.max(0, headers[ci].offsetLeft - _wrapper.clientWidth / 2 + headers[ci].offsetWidth / 2);
     }
     _wrapper.scrollTop = 0;
     stopScroll();
@@ -718,7 +726,7 @@ function highlightOutlier() {
       tds.forEach((td, colIdx) => {
         if (isOutlier(idx, colIdx)) {
           td.classList.remove('initial-anomaly');
-          td.style.backgroundColor = 'rgba(168,85,247,0.3)';
+          td.classList.add('hl-outlier');
           td.classList.add('highlighted');
           if (idx < minRow) { minRow = idx; minCol = colIdx; }
         }
@@ -788,15 +796,16 @@ function highlightOutlier() {
     return;
   }
 
-  // ====== 第3次及以后：跳转到异常值所在列居中 ======
+  // ====== 第3次及以后：跳转到异常值所在列居中 + 饼图清零 ======
   if (_outlierStage >= 2) {
+    // 饼图异常值数据清零重绘
+    outlierPos = [];
+    drawAbnormalChart();
+    // 跳转到第一个异常值列居中
     const headers = $$('#dataTable thead th');
-    const ci = KEY_COLS[0]; // 第一个关键列
-    for (let i = 0; i < headers.length; i++) {
-      if (headers[i].textContent.includes(currentHeaders[ci])) {
-        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
-        break;
-      }
+    let ci = getColIndex(KEY_COLS[0]);
+    if (ci >= 0 && ci < headers.length) {
+      _wrapper.scrollLeft = Math.max(0, headers[ci].offsetLeft - _wrapper.clientWidth / 2 + headers[ci].offsetWidth / 2);
     }
     _wrapper.scrollTop = 0;
     stopScroll();
@@ -816,7 +825,7 @@ function drawAbnormalChart() {
   const missCount = missingPos.length;
   const outCount = outlierPos.length;
   const total = currentRows.length;
-  const normalCount = total > 0 ? total - dupCount - outCount : 0;
+  const normalCount = total > 0 ? total - dupCount - missCount - outCount : 0;
 
   // 显示布局容器
   const layout = document.getElementById('abnormalLayout');
@@ -828,7 +837,7 @@ function drawAbnormalChart() {
   const items = [
     { type: 'dup',  label: '重复值',  val: dupCount,  color: '#f59e0b' },
     { type: 'miss',  label: '缺失值',  val: missCount, color: '#10b981' },
-    { type: 'outlier', label: '异常值', val: outCount,  color: '#ef4444' },
+    { type: 'outlier', label: '异常值', val: outCount,  color: '#e11d48' },
     { type: 'normal', label: '正常',    val: normalCount, color: '#2a3a5c' }
   ];
 
@@ -1047,14 +1056,19 @@ function drawNoiseSignal() {
 
   const N = rawVals.length;
 
-  // 移动平均滤波（窗口=5）
+  // 高斯滤波（窗口=5, σ=1.5）
+  const gaussKernel = [0.061, 0.242, 0.383, 0.242, 0.061];
+  const halfK = 2;
   const filteredVals = rawVals.map((_, i) => {
-    let sum = 0, count = 0;
-    for (let j = -2; j <= 2; j++) {
+    let sum = 0, weightSum = 0;
+    for (let j = -halfK; j <= halfK; j++) {
       const idx = i + j;
-      if (idx >= 0 && idx < rawVals.length) { sum += rawVals[idx]; count++; }
+      if (idx >= 0 && idx < rawVals.length) {
+        sum += rawVals[idx] * gaussKernel[j + halfK];
+        weightSum += gaussKernel[j + halfK];
+      }
     }
-    return sum / count;
+    return weightSum > 0 ? sum / weightSum : rawVals[i];
   });
 
   ctx.clearRect(0, 0, w, h);
@@ -1111,7 +1125,7 @@ function drawNoiseSignal() {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('噪声滤波 (移动平均, 窗口=5) - 已处理', w / 2, padding.top - 8);
+    ctx.fillText('噪声滤波 (高斯滤波, σ=1.5) - 已处理', w / 2, padding.top - 8);
   } else {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '10px sans-serif';
@@ -1199,7 +1213,7 @@ function drawNormChart() {
   const series = [
     { name: 'vibration_X', vals: getSeries(idxX), color: '#22d3ee' },
     { name: 'vibration_Z', vals: getSeries(idxZ), color: '#f59e0b' },
-    { name: 'noise_X', vals: getSeries(idxN), color: '#ef4444' }
+    { name: 'noise_X', vals: getSeries(idxN), color: '#fb7185' }
   ];
 
   // 所有值统一归一化到[0,1]
@@ -1245,13 +1259,13 @@ function drawNormChart() {
 
   drawSeries(idxX, '#22d3ee', 'vibration_X');
   drawSeries(idxZ, '#f59e0b', 'vibration_Z');
-  drawSeries(idxN, '#ef4444', 'noise_X');
+  drawSeries(idxN, '#fb7185', 'noise_X');
 
   // 图例
   const legendItems = [
     { name: 'vibration_X', color: '#22d3ee' },
     { name: 'vibration_Z', color: '#f59e0b' },
-    { name: 'noise_X', color: '#ef4444' }
+    { name: 'noise_X', color: '#fb7185' }
   ];
   let lx = padding.left + 5;
   ctx.font = '11px sans-serif';
@@ -1330,6 +1344,32 @@ function stepNormalize() {
   // 重绘归一化图（列名改名前，传入原始索引）
   drawNormChart();
   renderTable();
+
+  // 跳转到三列居中 + 高亮闪烁5秒
+  const normCols = ['vibration_X', 'vibration_Z', 'noise_X'];
+  let normColIndices = normCols.map(n => getColIndex(n)).filter(idx => idx >= 0);
+  if (normColIndices.length > 0) {
+    // 滚动到中间列居中
+    const midIdx = normColIndices[Math.floor(normColIndices.length / 2)];
+    const headers = $$('#dataTable thead th');
+    if (headers[midIdx + 1]) {
+      _wrapper.scrollLeft = Math.max(0, headers[midIdx + 1].offsetLeft - _wrapper.clientWidth / 2 + headers[midIdx + 1].offsetWidth / 2);
+    }
+    _wrapper.scrollTop = 0;
+    // 给三列所有td加高亮class
+    const rows = $$('#dataTable tbody tr');
+    rows.forEach((tr, idx) => {
+      const tds = tr.querySelectorAll('td:not(:first-child)');
+      normColIndices.forEach(ci => {
+        if (tds[ci]) tds[ci].classList.add('norm-flash');
+      });
+    });
+    // 5秒后移除高亮
+    setTimeout(() => {
+      document.querySelectorAll('td.norm-flash').forEach(td => td.classList.remove('norm-flash'));
+    }, 5000);
+  }
+
   checkExportReady();
   // 归一化处理后导出按钮不可点击
   _btnExport.disabled = true;
