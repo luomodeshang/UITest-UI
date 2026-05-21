@@ -682,9 +682,9 @@ function startScroll() {
   document.getElementById('scrollBtn').classList.add('running');
   const wrapper = document.getElementById('tableWrapper');
   scrollTimer = setInterval(() => {
-    wrapper.scrollTop += 3;
+    wrapper.scrollTop += 1;
     if (wrapper.scrollTop >= wrapper.scrollHeight - wrapper.clientHeight) wrapper.scrollTop = 0;
-  }, 15);
+  }, 25);
 }
 function stopScroll() {
   isScrolling = false;
