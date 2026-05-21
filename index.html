@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.9</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.10</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -262,7 +262,7 @@ async function stepImport() {
 
   _tableInfo.textContent = '加载中...';
 
-  const csvName = 'uidata' + dsId + '.csv';
+  const csvName = 'uidata' + dsId + '#.csv';
   // 从Pages同域获取CSV文件（避免raw.githubusercontent.com网络慢）
   const url = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/' + csvName;
 
@@ -313,6 +313,14 @@ function parseAndLoadCSV(text) {
   detectAllAnomalies();
   renderTable();
   // drawCharts() deferred to stepQualityReport()
+
+  // 导入后滚动到第15列居中
+  setTimeout(() => {
+    const headers = $$('#dataTable thead th');
+    if (headers.length > 15) {
+      _wrapper.scrollLeft = Math.max(0, headers[15].offsetLeft - _wrapper.clientWidth / 2 + headers[15].offsetWidth / 2);
+    }
+  }, 50);
 
   STEP_FLAGS.imported = true;
   _btnQuality.disabled = false;
@@ -609,8 +617,7 @@ function highlightMiss() {
 
     // 饼图对应数据清零
     drawAbnormalChart();
-    // 被填充列闪烁
-    flashColumns(keyIndices, 5000);
+
     _missStage = 2;
     STEP_FLAGS.missingProcessed = true;
     _btnDup.disabled = false;
@@ -697,16 +704,16 @@ function highlightDup() {
     }
 
     // 重置标记状态
-    missingPos = [];
-    outlierPos = [];
-    duplicateRows = [];
     STEP_FLAGS.missingProcessed = false;
     STEP_FLAGS.outlierProcessed = false;
     _btnMiss.disabled = true;
     _btnOutlier.disabled = true;
 
-    // 重新计算填充位置索引（删除行后索引偏移）
+    // 保存被删除的行集合（在 reset 之前）
     const dupSetSorted = new Set(duplicateRows);
+    missingPos = [];
+    outlierPos = [];
+    duplicateRows = [];
     function adjustIndex(idx, removed) {
       let result = idx;
       for (let r of removed) { if (r < result) result--; }
@@ -851,9 +858,7 @@ function highlightOutlier() {
     detectAllAnomalies();
     renderTable();
     drawAbnormalChart();
-    // 已填充列闪烁
-    const outFlashIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
-    flashColumns(outFlashIndices, 5000);
+
     _outlierStage = 2;
     STEP_FLAGS.outlierProcessed = true;
     _btnNoise.disabled = false;
@@ -1371,7 +1376,8 @@ function drawNormChart() {
   const isNormalized = globalMin >= 0 && globalMax <= 1;
   [0, 0.25, 0.5, 0.75, 1].forEach((v, i) => {
     const y = padding.top + (plotH / 4) * i;
-    const label = isNormalized ? v.toFixed(2) : ((1 - v) * 100).toFixed(0);
+    // 已归一化：0在下(1-v)，1在上(1-0)；原始数据：0在下(100)，100在上(0) 
+    const label = isNormalized ? (1 - v).toFixed(2) : (100 - v * 100).toFixed(0);
     ctx.fillText(label, padding.left - 5, y);
   });
 
