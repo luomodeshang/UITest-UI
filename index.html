@@ -919,7 +919,7 @@ function stepTimePreprocess() {
       const hh = String(d.getHours()).padStart(2, '0');
       const min = String(d.getMinutes()).padStart(2, '0');
       const ss = String(d.getSeconds()).padStart(2, '0');
-      currentRows[r][ci] = yy + mm + dd + ' ' + hh + min + ss + '.' + String(ms).padStart(3, '0');
+      currentRows[r][ci] = yy + '/' + mm + '/' + dd + ' ' + hh + '-' + min + '-' + ss + '.' + String(ms).padStart(3, '0');
       parsedRows[r][ci] = NaN; // 变为非数值
     }
   }
@@ -927,6 +927,18 @@ function stepTimePreprocess() {
   STEP_FLAGS.timePreprocessed = true;
   currentHeaders[ci] = currentHeaders[ci] + ' (时间)';
   renderTable();
+  // 定位到creation_date列居中
+  setTimeout(() => {
+    const wrapper = document.getElementById('tableWrapper');
+    const headers = document.querySelectorAll('#dataTable thead th');
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].textContent.includes('creation_date')) {
+        wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+        break;
+      }
+    }
+  }, 100);
+
   document.getElementById('btnMiss').disabled = false;
   document.querySelectorAll('.btn-preprocess, .btn-miss, .btn-dup, .btn-outlier, .btn-noise, .btn-norm')
     .forEach(b => b.classList.remove('active'));
