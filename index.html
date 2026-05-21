@@ -365,7 +365,7 @@ async function stepImport() {
     if (!resp.ok) throw new Error('HTTP ' + resp.status);
     const text = await resp.text();
     parseAndLoadCSV(text);
-    document.getElementById('tableInfo').textContent = currentRows.length + '行 x ' + currentHeaders.length + '列 | ' + csvName;
+    document.getElementById('tableInfo').textContent = '数据集 #' + dsId + ' | ' + currentRows.length + '行 x ' + currentHeaders.length + '列';
     document.getElementById('btnTime').disabled = false;
     sel.value = dsId;
   } catch (e) {
