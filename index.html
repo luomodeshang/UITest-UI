@@ -262,6 +262,7 @@ td.outlier { background:rgba(239,68,68,0.3) !important; color:#fca5a5; }
       </div>
       <div class="btn-group">
         <button class="btn btn-import" onclick="stepImport()">📥 导入数据集</button>
+        <button class="btn btn-quality" id="btnQuality" onclick="stepQualityReport()" disabled>📊 数据质量报告</button>
         <button class="btn btn-preprocess" id="btnTime" onclick="stepTimePreprocess()" disabled>⏰ 时间预处理</button>
         <button class="btn btn-miss" id="btnMiss" onclick="highlightMiss()" disabled>🟢 缺失值处理</button>
         <button class="btn btn-dup" id="btnDup" onclick="highlightDup()" disabled>🟠 重复值处理</button>
