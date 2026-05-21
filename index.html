@@ -930,13 +930,13 @@ function stepTimePreprocess() {
     const ms = Math.round((ts - sec) * 1000);
     const d = new Date(sec * 1000);
     if (!isNaN(d.getTime())) {
-      const yy = String(d.getFullYear()).slice(-2);
+      const yy = String(d.getFullYear());
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
       const hh = String(d.getHours()).padStart(2, '0');
       const min = String(d.getMinutes()).padStart(2, '0');
       const ss = String(d.getSeconds()).padStart(2, '0');
-      currentRows[r][ci] = yy + '/' + mm + '/' + dd + ' ' + hh + '-' + min + '-' + ss + '.' + String(ms).padStart(3, '0');
+      currentRows[r][ci] = yy + '/' + mm + '/' + dd + ' ' + hh + ':' + min + ':' + ss + '.' + String(ms).padStart(3, '0');
       parsedRows[r][ci] = NaN; // 变为非数值
     }
   }
