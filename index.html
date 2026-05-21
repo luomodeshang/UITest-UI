@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.15</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.16</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -860,14 +860,18 @@ function highlightOutlier() {
         }
       }
     }
-    // 重新检测并重绘
+    // 不再重新检测异常值（异常值已处理完，保留当前状态）
     outlierPos = [];
-    missingPos = [];
-    duplicateRows = [];
-    detectAllAnomalies();
+    // 保留已有 missingPos 和 duplicateRows 不变
     renderTable();
-    // 异常值已填充单元格保留背景色
+    // 保留缺失值和异常值已填充单元格背景色
     const outRows = $$('#dataTable tbody tr');
+    _filledMissCells.forEach(([r, ci]) => {
+      if (outRows[r]) {
+        const tds = outRows[r].querySelectorAll('td:not(:first-child)');
+        if (tds[ci]) tds[ci].classList.add('missing');
+      }
+    });
     _filledOutlierCells.forEach(([r, ci]) => {
       if (outRows[r]) {
         const tds = outRows[r].querySelectorAll('td:not(:first-child)');
@@ -889,10 +893,7 @@ function highlightOutlier() {
 
   // ====== 第3次及以后：跳转到异常值所在列居中 + 饼图清零 ======
   if (_outlierStage >= 2) {
-    // 饼图异常值数据清零重绘
-    outlierPos = [];
-    drawAbnormalChart();
-    // 跳转到第一个异常值列居中（用 th 文本匹配确保精确）
+    // 跳转到异常值处理列居中（不再重绘饼图，stage 2 已清零）
     let targetColName = KEY_COLS[0];
     const headers = $$('#dataTable thead th');
     for (let i = 1; i < headers.length; i++) {
@@ -908,11 +909,10 @@ function highlightOutlier() {
 
 // ====== 检查导出就绪 ======
 function checkExportReady() {
-  // 归一化后导出按钮永远不可用
-  if (STEP_FLAGS.normalized) { _btnExport.disabled = true; return; }
+  // 完成所有6步（含归一化）后启用导出
   const ready = STEP_FLAGS.timePreprocessed && STEP_FLAGS.missingProcessed &&
                 STEP_FLAGS.dupProcessed && STEP_FLAGS.outlierProcessed &&
-                STEP_FLAGS.noiseFiltered;
+                STEP_FLAGS.noiseFiltered && STEP_FLAGS.normalized;
   _btnExport.disabled = !ready;
 }
 
@@ -1468,8 +1468,6 @@ function stepNormalize() {
   }
 
   checkExportReady();
-  // 归一化处理后导出按钮不可点击
-  _btnExport.disabled = true;
 
   $$('.btn-preprocess,.btn-miss,.btn-dup,.btn-outlier,.btn-noise,.btn-norm')
     .forEach(b => b.classList.remove('active'));

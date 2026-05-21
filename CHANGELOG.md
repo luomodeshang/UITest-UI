@@ -331,6 +331,17 @@
 - **修复** 滑动窗口均值填充代码在 `for(ci)` 循环外部导致从未执行（异常值未处理）—— 修正后滑动窗口代码正确嵌入循环内部
 
 
+
+## [4.0.16] - 2026-05-21
+
+### 🐛 修复
+
+- **修复** 异常值处理后缺失值背景消失：`renderTable()` 后同时恢复 `_filledMissCells` 的 `missing` class
+- **修复** 异常值 stage 3+ 跳转不正常：去掉 `outlierPos = []; drawAbnormalChart()` 重复清零操作（stage 2 已完成），仅做跳转
+- **修复** 异常值处理后不再重新检测异常值：去掉 `detectAllAnomalies()` 调用，保留已有的 `missingPos`/`duplicateRows` 状态
+- **修改** 导出按钮逻辑：做完所有 6 步（含归一化）后启用，噪声滤波后不再提前启用；去掉 `stepNormalize` 末尾的 `_btnExport.disabled = true` 强制覆盖
+
+
 ## [4.0.5] - 2026-05-21
 
 ### 🐛 修复 & 🎨 统一
