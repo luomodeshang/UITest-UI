@@ -172,6 +172,13 @@
 - **修复** `function drawAbnormalChart()` 函数声明在 v3.3.0 重构中丢失，环形图代码悬浮在全局
 
 
+
+## [4.0.1] - 2026-05-21
+
+### 🐛 修复
+
+- **修复** `drawAbnormalChart()` 中 `dupCount` 未定义错误（删除重复函数时遗漏了变量声明）
+- **修复** CSV 导入改用 Pages 同域 URL（`./uidata1%23.csv`），替代慢速的 raw.githubusercontent.com
 ## [4.0.0] - 2026-05-21
 
 ### ♻️ 代码精简（准备新迭代）

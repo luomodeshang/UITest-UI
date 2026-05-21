@@ -808,6 +808,12 @@ function checkExportReady() {
 }
 
 function drawAbnormalChart() {
+  const dupCount = duplicateRows.length;
+  const missCount = missingPos.length;
+  const outCount = outlierPos.length;
+  const total = currentRows.length;
+  const normalCount = total > 0 ? total - dupCount - outCount : 0;
+
   // 显示布局容器
   const layout = document.getElementById('abnormalLayout');
   const placeholder = document.getElementById('chartAbnormal').querySelector('.placeholder');
