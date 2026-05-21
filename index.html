@@ -141,8 +141,10 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
     <section class="center-panel">
       <div class="table-toolbar">
         <div class="info">数据：<span id="tableInfo">未加载</span></div>
-        <button class="toggle-scroll" id="scrollBtn" onclick="toggleScroll()">⏸ 暂停滚动</button>
-        <button class="toggle-scroll" id="speedBtn" onclick="toggleSpeed()" style="margin-left:4px;">⚡ X2</button>
+        <div style="display:flex;gap:4px;">
+          <button class="toggle-scroll" id="scrollBtn" onclick="toggleScroll()">⏸ 暂停滚动</button>
+          <button class="toggle-scroll" id="speedBtn" onclick="toggleSpeed()">⚡ X2</button>
+        </div>
       </div>
       <div class="table-wrapper" id="tableWrapper">
         <table id="dataTable"></table>
