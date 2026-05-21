@@ -63,6 +63,21 @@ body {
   border-right:1px solid #1e3a5f;
   display:flex; flex-direction:column; align-items:center; padding:16px 0;
 }
+.dataset-selector {
+  width:170px; margin-bottom:20px;
+}
+.dataset-selector label {
+  display:block; font-size:0.75rem; color:#64748b; margin-bottom:6px;
+  text-align:center; letter-spacing:1px;
+}
+.dataset-selector select {
+  width:100%; padding:8px 12px;
+  background:#1a2236; color:#e0e8f0; border:1px solid #2a3a5c;
+  border-radius:6px; font-size:0.85rem; cursor:pointer;
+  outline:none; transition:border-color 0.3s;
+}
+.dataset-selector select:hover { border-color:#00d4ff; }
+.dataset-selector select:focus { border-color:#0088ff; box-shadow:0 0 8px rgba(0,136,255,0.3); }
 .btn-group { display:flex; flex-direction:column; gap:10px; width:170px; }
 .btn {
   width:100%; padding:12px 0;
@@ -238,6 +253,12 @@ td.outlier { background:rgba(239,68,68,0.3) !important; color:#fca5a5; }
 
     <!-- 左侧面板 -->
     <aside class="left-panel">
+      <div class="dataset-selector">
+        <label>▎数据集选择</label>
+        <select id="datasetSelect">
+          <option value="0">随机导入</option>
+        </select>
+      </div>
       <div class="btn-group">
         <button class="btn btn-import" onclick="stepImport()">📥 导入数据集</button>
         <button class="btn btn-preprocess" id="btnTime" onclick="stepTimePreprocess()" disabled>⏰ 时间预处理</button>
@@ -316,22 +337,40 @@ function getColIndex(name) {
   return currentHeaders.indexOf(name);
 }
 
+(function initSelector() {
+  const sel = document.getElementById('datasetSelect');
+  for (let i = 1; i <= 20; i++) {
+    const opt = document.createElement('option');
+    opt.value = i;
+    opt.textContent = '数据集 #' + i;
+    sel.appendChild(opt);
+  }
+})();
+
 // ====== CSV 加载与解析 ======
 async function stepImport() {
-  // 弹出文件选择器让用户选CSV
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.csv';
-  input.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    document.getElementById('tableInfo').textContent = '加载中...';
-    const text = await file.text();
+  const sel = document.getElementById('datasetSelect');
+  let dsId = parseInt(sel.value);
+  if (dsId === 0) dsId = Math.floor(Math.random() * 20) + 1;
+
+  document.getElementById('tableInfo').textContent = '加载中...';
+
+  // 从GitHub仓库根目录获取CSV文件
+  const csvName = 'uidata' + dsId + '#.csv';
+  const url = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/' + csvName;
+
+  try {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const text = await resp.text();
     parseAndLoadCSV(text);
-    document.getElementById('tableInfo').textContent = currentRows.length + '行 x ' + currentHeaders.length + '列 | ' + file.name;
+    document.getElementById('tableInfo').textContent = currentRows.length + '行 x ' + currentHeaders.length + '列 | ' + csvName;
     document.getElementById('btnTime').disabled = false;
-  };
-  input.click();
+    sel.value = dsId;
+  } catch (e) {
+    document.getElementById('tableInfo').textContent = '❌ 加载失败: ' + csvName;
+    alert('加载失败，请检查文件是否存在: ' + csvName + '\n' + e.message);
+  }
 }
 
 function parseAndLoadCSV(text) {
