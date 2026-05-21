@@ -40,7 +40,7 @@ body { background:#0a0e17; color:#e0e8f0; font-family:'Microsoft YaHei','PingFan
 .btn-quality.active { background:rgba(6,182,212,.15); border-color:#06b6d4; color:#22d3ee; }
 .btn-miss.active { background:rgba(16,185,129,.15); border-color:#10b981; color:#34d399; }
 .btn-dup.active { background:rgba(245,158,11,.15); border-color:#f59e0b; color:#fbbf24; }
-.btn-outlier.active { background:rgba(239,68,68,.15); border-color:#ef4444; color:#f87171; }
+.btn-outlier.active { background:rgba(168,85,247,.15); border-color:#a855f7; color:#c084fc; }
 .btn-preprocess.active { background:rgba(139,92,246,.15); border-color:#8b5cf6; color:#a78bfa; }
 .btn-noise.active { background:rgba(34,211,238,.15); border-color:#22d3ee; color:#67e8f9; }
 .btn-norm.active { background:rgba(251,191,36,.15); border-color:#fbbf24; color:#fcd34d; }
@@ -128,7 +128,7 @@ td.outlier { background:rgba(239,68,68,.3) !important; color:#fca5a5; }
         <button class="btn btn-preprocess" id="btnTime" onclick="stepTimePreprocess()" disabled>⏰ 时间预处理</button>
         <button class="btn btn-miss" id="btnMiss" onclick="highlightMiss()" disabled>🟢 缺失值处理</button>
         <button class="btn btn-dup" id="btnDup" onclick="highlightDup()" disabled>🟠 重复值处理</button>
-        <button class="btn btn-outlier" id="btnOutlier" onclick="highlightOutlier()" disabled>🔴 异常值处理</button>
+        <button class="btn btn-outlier" id="btnOutlier" onclick="highlightOutlier()" disabled>🟣 异常值处理</button>
         <button class="btn btn-noise" id="btnNoise" onclick="stepNoiseFilter()" disabled>🌊 噪声滤波</button>
         <button class="btn btn-norm" id="btnNorm" onclick="stepNormalize()" disabled>📐 归一化处理</button>
         <button class="btn btn-export" id="btnExport" onclick="exportDataset()" disabled>💾 导出数据集</button>
@@ -599,16 +599,18 @@ function highlightMiss() {
     return;
   }
 
-  // ====== 第3次及以后：跳转到处理过的缺失值位置 ======
+  // ====== 第3次及以后：跳转到第一个缺失值所在列 ======
   if (_missStage >= 2) {
-    // 定位到第一个原缺失值位置（已被填充）
-    const rows = $$('#dataTable tbody tr');
-    if (rows.length > 0) {
-      const wrapper = _wrapper;
-      const rowHeight = rows[0].offsetHeight || 30;
-      wrapper.scrollTop = 0;
-      wrapper.scrollLeft = 0;
+    // 定位到缺失值所在列居中
+    const headers = $$('#dataTable thead th');
+    const ci = KEY_COLS[0]; // 第一个关键列（vibration_X）
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].textContent.includes(currentHeaders[ci])) {
+        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+        break;
+      }
     }
+    _wrapper.scrollTop = 0;
     stopScroll();
   }
 }
@@ -716,7 +718,7 @@ function highlightOutlier() {
       tds.forEach((td, colIdx) => {
         if (isOutlier(idx, colIdx)) {
           td.classList.remove('initial-anomaly');
-          td.style.backgroundColor = 'rgba(239,68,68,0.3)';
+          td.style.backgroundColor = 'rgba(168,85,247,0.3)';
           td.classList.add('highlighted');
           if (idx < minRow) { minRow = idx; minCol = colIdx; }
         }
@@ -786,15 +788,17 @@ function highlightOutlier() {
     return;
   }
 
-  // ====== 第3次及以后：跳转到处理过的异常值位置 ======
+  // ====== 第3次及以后：跳转到异常值所在列居中 ======
   if (_outlierStage >= 2) {
-    const rows = $$('#dataTable tbody tr');
-    if (rows.length > 0) {
-      const wrapper = _wrapper;
-      const rowHeight = rows[0].offsetHeight || 30;
-      wrapper.scrollTop = 0;
-      wrapper.scrollLeft = 0;
+    const headers = $$('#dataTable thead th');
+    const ci = KEY_COLS[0]; // 第一个关键列
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].textContent.includes(currentHeaders[ci])) {
+        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+        break;
+      }
     }
+    _wrapper.scrollTop = 0;
     stopScroll();
   }
 }
@@ -897,48 +901,6 @@ function drawAbnormalChart() {
     startAngle += angle;
   });
 
-  // 再次遍历，画连线到右侧文本
-  startAngle = -Math.PI / 2;
-  items.forEach((item, i) => {
-    if (item.val === 0) return;
-    const midAngle = startAngle + angles[i] / 2;
-
-    // 饼图边缘点
-    const edgeX = cx + Math.cos(midAngle) * radius;
-    const edgeY = cy + Math.sin(midAngle) * radius;
-
-    // 右侧文本项的中心Y位置（相对pieContainer）
-    const legendEl = document.querySelector('.legend-item[data-type="' + item.type + '"]');
-    let targetY = cy; // fallback
-    if (legendEl) {
-      const legendRect = legendEl.getBoundingClientRect();
-      const layoutRect = layout.getBoundingClientRect();
-      targetY = legendRect.top - layoutRect.top + legendRect.height / 2;
-    }
-
-    // 折线连接：从饼图边缘→水平右延→垂直弯到文本Y→短水平到文本
-    const pieRight = w * 0.45;
-    const textLeft = pieRight + 8;
-
-    ctx.beginPath();
-    ctx.moveTo(edgeX, edgeY);
-    ctx.lineTo(pieRight, edgeY);
-    ctx.lineTo(pieRight, targetY);
-    ctx.lineTo(textLeft, targetY);
-    ctx.strokeStyle = item.color;
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-    ctx.globalAlpha = 1.0;
-
-    // 文本起点小圆点
-    ctx.beginPath();
-    ctx.arc(textLeft, targetY, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = item.color;
-    ctx.fill();
-
-    startAngle += angles[i];
-  });
 
   // 中心文字
   ctx.fillStyle = '#e0e8f0';
@@ -1303,7 +1265,7 @@ function drawNormChart() {
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText('归一化对比 [' + globalMin.toFixed(1) + ' ~ ' + globalMax.toFixed(1) + '] → [0, 1]', w / 2, padding.top - 8);
+  ctx.fillText('归一化处理结果 [0, 1]', w / 2, padding.top - 8);
 
   // Y轴标签
   ctx.fillStyle = '#64748b';
@@ -1364,6 +1326,10 @@ function stepNormalize() {
   STEP_FLAGS.normalized = true;
   renderTable();
   checkExportReady();
+  // 归一化处理后导出按钮不可点击
+  _btnExport.disabled = true;
+  // 重绘归一化图（只显示处理后的数据）
+  drawNormChart();
 
   $$('.btn-preprocess,.btn-miss,.btn-dup,.btn-outlier,.btn-noise,.btn-norm')
     .forEach(b => b.classList.remove('active'));
