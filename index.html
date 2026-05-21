@@ -104,6 +104,7 @@ body {
 .btn-export:disabled::before { display:none; }
 .btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
 .btn-import.active { background:rgba(59,130,246,0.15); border-color:#3b82f6; color:#60a5fa; }
+.btn-quality.active { background:rgba(139,92,246,0.15); border-color:#8b5cf6; color:#a78bfa; }
 .btn-miss.active { background:rgba(16,185,129,0.15); border-color:#10b981; color:#34d399; }
 .btn-dup.active { background:rgba(245,158,11,0.15); border-color:#f59e0b; color:#fbbf24; }
 .btn-outlier.active { background:rgba(239,68,68,0.15); border-color:#ef4444; color:#f87171; }
@@ -284,7 +285,7 @@ td.outlier { background:rgba(239,68,68,0.3) !important; color:#fca5a5; }
 
     <!-- 右侧图表区 -->
     <aside class="right-panel">
-      <h3>▎数据质量概览</h3>
+      <h3>▎数据质量报告</h3>
       <div class="chart-section">
         <div class="chart-box chart-top" id="chartAbnormal">
           <div class="placeholder">异常分布饼图<br><small>导入数据后显示</small></div>
@@ -407,10 +408,11 @@ function parseAndLoadCSV(text) {
   // 检测所有异常
   detectAllAnomalies();
   renderTable();
-  drawCharts();
+  // drawCharts() deferred to stepQualityReport()
 
   STEP_FLAGS.imported = true;
   document.getElementById('btnTime').disabled = false;
+  document.getElementById('btnQuality').disabled = false;
 
   // 重置流程
   STEP_FLAGS.timePreprocessed = false;
@@ -1286,6 +1288,18 @@ function stepNormalize() {
   document.getElementById('btnNorm').classList.add('active');
 }
 
+// ====== 数据质量报告 ======
+function stepQualityReport() {
+  if (!currentHeaders || !currentRows.length) { alert('请先导入数据集'); return; }
+  // 显示右侧图表
+  drawCharts();
+  document.querySelectorAll('.btn-quality, .btn-import, .btn-preprocess, .btn-miss, .btn-dup, .btn-outlier, .btn-noise, .btn-norm')
+    .forEach(b => b.classList.remove('active'));
+  document.getElementById('btnQuality').classList.add('active');
+  // 滚动到表格顶部
+  document.getElementById('tableWrapper').scrollTop = 0;
+}
+
 // ====== 图表重绘入口 ======
 function drawCharts() {
   drawAbnormalChart();
@@ -1322,7 +1336,7 @@ let resizeTimer;
 window.addEventListener('resize', () => {
   clearTimeout(resizeTimer);
   resizeTimer = setTimeout(() => {
-    if (STEP_FLAGS.imported) drawCharts();
+    if (STEP_FLAGS.imported && document.getElementById('btnQuality').classList.contains('active')) drawCharts();
   }, 300);
 });
 </script>
