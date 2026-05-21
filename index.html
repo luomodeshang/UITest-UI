@@ -289,15 +289,25 @@ td.outlier { background:rgba(239,68,68,0.3) !important; color:#fca5a5; }
       <h3>▎数据质量报告</h3>
       <div class="chart-section">
         <div class="chart-box chart-top" id="chartAbnormal">
-          <div class="placeholder">异常分布饼图<br><small>导入数据后显示</small></div>
-          <canvas id="canvasAbnormal" style="display:none"></canvas>
+          <div class="placeholder">异常分布<br><small>导入数据后显示</small></div>
+          <div class="abnormal-layout" id="abnormalLayout" style="display:none;width:100%;height:100%;position:relative;">
+            <div class="abnormal-pie" id="pieContainer" style="position:absolute;left:0;top:0;width:45%;height:100%;">
+              <canvas id="canvasAbnormal" style="width:100%;height:100%;"></canvas>
+            </div>
+            <div class="abnormal-legend" id="legendContainer" style="position:absolute;right:5px;top:10px;width:50%;height:calc(100% - 20px);display:flex;flex-direction:column;justify-content:center;gap:6px;">
+              <div class="legend-item" data-type="dup" style="display:none;font-size:0.75rem;color:#94a3b8;padding:2px 8px;"><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;"></span><span class="legend-label"></span><span class="legend-val" style="color:#e0e8f0;font-weight:600;margin-left:4px;"></span><span class="legend-pct" style="color:#64748b;margin-left:2px;"></span></div>
+              <div class="legend-item" data-type="miss" style="display:none;font-size:0.75rem;color:#94a3b8;padding:2px 8px;"><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;"></span><span class="legend-label"></span><span class="legend-val" style="color:#e0e8f0;font-weight:600;margin-left:4px;"></span><span class="legend-pct" style="color:#64748b;margin-left:2px;"></span></div>
+              <div class="legend-item" data-type="outlier" style="display:none;font-size:0.75rem;color:#94a3b8;padding:2px 8px;"><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;"></span><span class="legend-label"></span><span class="legend-val" style="color:#e0e8f0;font-weight:600;margin-left:4px;"></span><span class="legend-pct" style="color:#64748b;margin-left:2px;"></span></div>
+              <div class="legend-item" data-type="normal" style="font-size:0.75rem;color:#94a3b8;padding:2px 8px;"><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;"></span><span class="legend-label"></span><span class="legend-val" style="color:#e0e8f0;font-weight:600;margin-left:4px;"></span><span class="legend-pct" style="color:#64748b;margin-left:2px;"></span></div>
+            </div>
+          </div>
         </div>
         <div class="chart-box chart-middle" id="chartNoise">
           <div class="placeholder">噪声滤波折线图<br><small>导入数据后显示</small></div>
           <canvas id="canvasNoise" style="display:none"></canvas>
         </div>
         <div class="chart-box chart-bottom" id="chartNorm">
-          <div class="placeholder">归一化对比图<br><small>导入数据后显示</small></div>
+          <div class="placeholder">归一化处理<br><small>导入数据后显示</small></div>
           <canvas id="canvasNorm" style="display:none"></canvas>
         </div>
       </div>
@@ -335,6 +345,7 @@ let STEP_FLAGS = {
 let _missStage = 0;
 let _dupStage = 0;
 let _outlierStage = 0;
+let _timeStage = 0;
 let _firstDupRow = -1;  // 记录第一个被删除的重复行位置
 
 // 关键列名（数据质量检测用）
@@ -374,7 +385,6 @@ async function stepImport() {
     const text = await resp.text();
     parseAndLoadCSV(text);
     document.getElementById('tableInfo').textContent = '数据集 #' + dsId + ' | ' + currentRows.length + '行 x ' + currentHeaders.length + '列';
-    document.getElementById('btnTime').disabled = false;
     sel.value = dsId;
   } catch (e) {
     document.getElementById('tableInfo').textContent = '❌ 加载失败: ' + csvName;
@@ -418,7 +428,6 @@ function parseAndLoadCSV(text) {
   // drawCharts() deferred to stepQualityReport()
 
   STEP_FLAGS.imported = true;
-  document.getElementById('btnTime').disabled = false;
   document.getElementById('btnQuality').disabled = false;
 
   // 重置流程
@@ -431,6 +440,7 @@ function parseAndLoadCSV(text) {
   _missStage = 0;
   _dupStage = 0;
   _outlierStage = 0;
+  _timeStage = 0;
   _firstDupRow = -1;
   document.getElementById('btnMiss').disabled = true;
   document.getElementById('btnDup').disabled = true;
@@ -765,12 +775,61 @@ function highlightMiss() {
         }
       }
     }
-    // 重新检测并重绘
-    missingPos = [];
+    // 标记被填充的单元格（保留绿色背景）
+    const filledCells = [];
+    const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+    for (let r = 0; r < parsedRows.length; r++) {
+      for (let ci of keyIndices) {
+        if (isMissing(r, ci)) filledCells.push([r, ci]);
+      }
+    }
+
+    // 重新检测（排除已填充的缺失值）
+    const prevMissing = missingPos.slice();
     outlierPos = [];
     duplicateRows = [];
-    detectAllAnomalies();
+    // 只重新检测异常值和重复行
+    const oldMissing = missingPos;
+    missingPos = [];
+    const keyIndices2 = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+    for (let ci of keyIndices2) {
+      const vals = [];
+      for (let r = 0; r < parsedRows.length; r++) {
+        const v = parsedRows[r][ci];
+        if (!isNaN(v)) vals.push(v);
+      }
+      if (vals.length < 3) continue;
+      const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+      const std = Math.sqrt(vals.reduce((a,b) => a + (b-mean)**2, 0) / vals.length);
+      const lower = mean - 3 * std;
+      const upper = mean + 3 * std;
+      for (let r = 0; r < parsedRows.length; r++) {
+        const v = parsedRows[r][ci];
+        if (!isNaN(v) && (v < lower || v > upper)) outlierPos.push([r, ci]);
+      }
+    }
+    // 重复行检测
+    const seen = {};
+    for (let r = 0; r < currentRows.length; r++) {
+      const key = currentRows[r].join('\x00');
+      if (key in seen) duplicateRows.push(r);
+      else seen[key] = r;
+    }
+
     renderTable();
+
+    // 给被填充的单元格添加绿色背景
+    const tableRows = document.querySelectorAll('#dataTable tbody tr');
+    filledCells.forEach(([r, ci]) => {
+      if (tableRows[r]) {
+        const tds = tableRows[r].querySelectorAll('td:not(:first-child)');
+        if (tds[ci]) {
+          tds[ci].classList.add('missing');
+          tds[ci].classList.add('highlighted');
+        }
+      }
+    });
+
     // 饼图对应数据清零
     drawAbnormalChart();
     _missStage = 2;
@@ -862,6 +921,7 @@ function highlightDup() {
     _firstDupRow = Math.min(_firstDupRow, currentRows.length - 1);
     STEP_FLAGS.dupProcessed = true;
     document.getElementById('btnMiss').disabled = false;
+    document.getElementById('btnOutlier').disabled = false;
     checkExportReady();
     document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
     document.getElementById('btnDup').classList.add('active');
@@ -991,145 +1051,151 @@ function checkExportReady() {
   document.getElementById('btnExport').disabled = !ready;
 }
 
-// ====== 饼图绘制 ======
-function drawPie(canvasId, labels, values, colors, total) {
-  const canvas = document.getElementById(canvasId);
-  const container = canvas.parentElement;
-  const placeholder = container.querySelector('.placeholder');
+  // 显示布局容器
+  const layout = document.getElementById('abnormalLayout');
+  const placeholder = document.getElementById('chartAbnormal').querySelector('.placeholder');
   if (placeholder) placeholder.style.display = 'none';
-  canvas.style.display = 'block';
+  if (layout) layout.style.display = 'block';
+
+  // 更新右侧文本信息
+  const items = [
+    { type: 'dup',  label: '重复值',  val: dupCount,  color: '#f59e0b' },
+    { type: 'miss',  label: '缺失值',  val: missCount, color: '#10b981' },
+    { type: 'outlier', label: '异常值', val: outCount,  color: '#ef4444' },
+    { type: 'normal', label: '正常',    val: normalCount, color: '#2a3a5c' }
+  ];
+
+  items.forEach(item => {
+    const el = document.querySelector('.legend-item[data-type="' + item.type + '"]');
+    if (!el) return;
+    el.style.display = item.val > 0 || item.type === 'normal' ? 'flex' : 'none';
+    el.querySelector('.legend-dot').style.background = item.color;
+    el.querySelector('.legend-label').textContent = item.label;
+    el.querySelector('.legend-val').textContent = item.val;
+    const pct = total > 0 ? (item.val / total * 100) : 0;
+    const pctStr = pct < 0.1 ? pct.toFixed(2) : pct.toFixed(1);
+    el.querySelector('.legend-pct').textContent = '(' + pctStr + '%)';
+  });
+
+  // 绘制左侧环形图 + 连接线
+  const canvas = document.getElementById('canvasAbnormal');
+  const container = document.getElementById('pieContainer');
+  if (!canvas || !container) return;
 
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
   const rect = container.getBoundingClientRect();
-  canvas.width = (rect.width - 16) * dpr;
-  canvas.height = (rect.height - 16) * dpr;
-  canvas.style.width = (rect.width - 16) + 'px';
-  canvas.style.height = (rect.height - 16) + 'px';
+  const w = rect.width, h = rect.height;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
   ctx.scale(dpr, dpr);
 
-  const w = canvas.width / dpr, h = canvas.height / dpr;
-  const cx = w / 2, cy = h / 2;
-  const radius = Math.min(w, h) / 2 - 20;
   ctx.clearRect(0, 0, w, h);
 
-  total = total || values.reduce((a,b) => a+b, 0) || 1;
+  const cx = w / 2, cy = h / 2;
+  const radius = Math.min(w, h) / 2 - 15;
+  const innerRadius = radius * 0.55; // 环形图内径
+  const MIN_ANGLE = 0.087; // ~5度
+
+  // 计算各扇形角度
+  const rawAngles = items.map(item => item.val > 0 ? (item.val / total) * 2 * Math.PI : 0);
+  const angles = rawAngles.map(a => a > 0 ? Math.max(a, MIN_ANGLE) : 0);
+
+  // 收集有值的扇形
+  const sliceStartAngles = [];
   let startAngle = -Math.PI / 2;
+  items.forEach((item, i) => {
+    if (item.val === 0) return;
+    sliceStartAngles.push(startAngle);
+    startAngle += angles[i];
+  });
 
-  const MIN_ANGLE = 0.087; // ~5度，确保极小扇形也可见
-  values.forEach((val, i) => {
-    if (val === 0) return;
-    const rawAngle = (val / total) * 2 * Math.PI;
-    const angle = Math.max(rawAngle, MIN_ANGLE);
-    const midAngle = startAngle + angle / 2;
-    const pct = (val / total * 100);
-    const displayPct = pct < 0.1 ? pct.toFixed(2) : pct.toFixed(1);
-
+  // 重绘：先画环形
+  startAngle = -Math.PI / 2;
+  items.forEach((item, i) => {
+    if (item.val === 0) return;
+    const angle = angles[i];
+    // 外弧
     ctx.beginPath();
-    ctx.moveTo(cx, cy);
     ctx.arc(cx, cy, radius, startAngle, startAngle + angle);
+    // 内弧（逆时针）
+    ctx.arc(cx, cy, innerRadius, startAngle + angle, startAngle, true);
     ctx.closePath();
-    ctx.fillStyle = colors[i];
+    ctx.fillStyle = item.color;
     ctx.fill();
+
+    // 扇形边线
     ctx.strokeStyle = '#0d111d';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    const labelRadius = radius * 0.65;
-    const labelX = cx + Math.cos(midAngle) * labelRadius;
-    const labelY = cy + Math.sin(midAngle) * labelRadius;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 13px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(val, labelX, labelY - 10);
-    ctx.font = '11px sans-serif';
-    ctx.fillStyle = 'rgba(255,255,255,0.7)';
-    ctx.fillText(displayPct + '%', labelX, labelY + 8);
     startAngle += angle;
   });
 
+  // 再次遍历，画连线到右侧
+  startAngle = -Math.PI / 2;
+  const legendItems = document.querySelectorAll('.legend-item');
+  items.forEach((item, i) => {
+    if (item.val === 0) return;
+    const midAngle = startAngle + angles[i] / 2;
+
+    // 饼图边缘点
+    const edgeX = cx + Math.cos(midAngle) * radius;
+    const edgeY = cy + Math.sin(midAngle) * radius;
+
+    // 右侧文本项的中心Y位置
+    const legendEl = document.querySelector('.legend-item[data-type="' + item.type + '"]');
+    let targetY = cy; // fallback
+    if (legendEl) {
+      const legendRect = legendEl.getBoundingClientRect();
+      const layoutRect = layout.getBoundingClientRect();
+      targetY = legendRect.top - layoutRect.top + legendRect.height / 2;
+    }
+
+    // X
+    const midX = w * 0.55;
+    const lineEndX = w * 0.50;
+
+    // 曲线连线（贝塞尔）
+    const cp1x = (edgeX + midX) / 2;
+    const cp1y = edgeY;
+    const cp2x = (midX + lineEndX) / 2;
+    const cp2y = targetY;
+
+    ctx.beginPath();
+    ctx.moveTo(edgeX, edgeY);
+    ctx.quadraticCurveTo(cp1x, cp1y, lineEndX, targetY);
+    ctx.strokeStyle = item.color;
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+    ctx.globalAlpha = 1.0;
+
+    startAngle += angles[i];
+  });
+
+  // 中心文字
   ctx.fillStyle = '#e0e8f0';
-  ctx.font = 'bold 16px sans-serif';
+  ctx.font = 'bold 20px sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(total, cx, cy - 10);
+  ctx.fillText(total, cx, cy - 8);
   ctx.fillStyle = '#64748b';
   ctx.font = '11px sans-serif';
-  ctx.fillText('总行数', cx, cy + 8);
-
-  const legendY = h - 10;
-  let legendX = 10;
-  ctx.font = '11px sans-serif';
-  labels.forEach((label, i) => {
-    if (values[i] === 0) return;
-    const pct = (values[i] / total * 100);
-    const pctStr = pct < 0.1 ? pct.toFixed(2) : pct.toFixed(1);
-    const text = label + ': ' + values[i] + ' (' + pctStr + '%)';
-    ctx.fillStyle = colors[i];
-    ctx.fillRect(legendX, legendY - 5, 8, 8);
-    ctx.fillStyle = '#94a3b8';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(text, legendX + 12, legendY);
-    legendX += ctx.measureText(text).width + 20;
-  });
-}
-
-// ====== 绘制异常分布饼图 ======
-function drawAbnormalChart() {
-  const total = currentRows.length;
-  const dupCount = duplicateRows.length;
-  const missCount = missingPos.length;
-  const outCount = outlierPos.length;
-  labels = ['重复值', '缺失值', '异常值', '正常'];
-  values = [dupCount, missCount, outCount, total - dupCount - missCount - outCount];
-  colors = ['#f59e0b', '#10b981', '#ef4444', '#2a3a5c'];
-  drawPie('canvasAbnormal', labels, values, colors, total);
+  ctx.fillText('总行数', cx, cy + 14);
 }
 
 // ====== 时间预处理 ======
 function stepTimePreprocess() {
   if (!currentHeaders || !currentRows.length) return;
-  if (STEP_FLAGS.timePreprocessed) { alert('时间预处理已完成'); return; }
 
   const ci = getColIndex('creation_date');
-  if (ci < 0) { alert('未找到 creation_date 列，跳过此步骤'); STEP_FLAGS.timePreprocessed = true; document.getElementById('btnMiss').disabled = false; return; }
 
-  // 检测是否unix时间戳
-  let validCount = 0;
-  for (let r = 0; r < parsedRows.length; r++) {
-    const v = parsedRows[r][ci];
-    if (!isNaN(v) && v > 1e8 && v < 2e12) validCount++;
-  }
-  if (validCount < 10) { alert('creation_date 列不是有效unix时间戳，跳过'); STEP_FLAGS.timePreprocessed = true; document.getElementById('btnMiss').disabled = false; return; }
-
-  // 转换: YYMMDD hhmmss.000 毫秒格式
-  for (let r = 0; r < parsedRows.length; r++) {
-    const v = parsedRows[r][ci];
-    if (isNaN(v) || v < 1e8) continue;
-    // creation_date是毫秒级带小数的时间戳（如1779172858.447）
-    const ts = v; // 已经是秒级+毫秒
-    const sec = Math.floor(ts);
-    const ms = Math.round((ts - sec) * 1000);
-    const d = new Date(sec * 1000);
-    if (!isNaN(d.getTime())) {
-      const yy = String(d.getFullYear());
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      const hh = String(d.getHours()).padStart(2, '0');
-      const min = String(d.getMinutes()).padStart(2, '0');
-      const ss = String(d.getSeconds()).padStart(2, '0');
-      currentRows[r][ci] = yy + '/' + mm + '/' + dd + ' ' + hh + ':' + min + ':' + ss + '.' + String(ms).padStart(3, '0');
-      parsedRows[r][ci] = NaN; // 变为非数值
-    }
-  }
-
-  STEP_FLAGS.timePreprocessed = true;
-  currentHeaders[ci] = currentHeaders[ci] + ' (时间)';
-  renderTable();
-  // 定位到creation_date列居中
-  setTimeout(() => {
+  // ====== 第1次点击：定位到creation_date列居中 ======
+  if (_timeStage === 0) {
+    if (ci < 0) { alert('未找到 creation_date 列'); return; }
     const wrapper = document.getElementById('tableWrapper');
     const headers = document.querySelectorAll('#dataTable thead th');
     for (let i = 0; i < headers.length; i++) {
@@ -1138,13 +1204,83 @@ function stepTimePreprocess() {
         break;
       }
     }
-  }, 100);
+    _timeStage = 1;
+    document.querySelectorAll('.btn-preprocess, .btn-miss, .btn-dup, .btn-outlier, .btn-noise, .btn-norm')
+      .forEach(b => b.classList.remove('active'));
+    document.getElementById('btnTime').classList.add('active');
+    stopScroll();
+    return;
+  }
 
-  document.getElementById('btnMiss').disabled = false;
-  document.querySelectorAll('.btn-preprocess, .btn-miss, .btn-dup, .btn-outlier, .btn-noise, .btn-norm')
-    .forEach(b => b.classList.remove('active'));
-  document.getElementById('btnTime').classList.add('active');
-  checkExportReady();
+  // ====== 第2次点击：执行时间戳转换 ======
+  if (_timeStage === 1) {
+    if (ci < 0) { alert('未找到 creation_date 列，跳过此步骤'); STEP_FLAGS.timePreprocessed = true; document.getElementById('btnMiss').disabled = false; return; }
+
+    // 检测是否unix时间戳
+    let validCount = 0;
+    for (let r = 0; r < parsedRows.length; r++) {
+      const v = parsedRows[r][ci];
+      if (!isNaN(v) && v > 1e8 && v < 2e12) validCount++;
+    }
+    if (validCount < 10) { alert('creation_date 列不是有效unix时间戳，跳过'); STEP_FLAGS.timePreprocessed = true; document.getElementById('btnMiss').disabled = false; return; }
+
+    // 转换: YYYY/MM/DD hh:mm:ss.000
+    for (let r = 0; r < parsedRows.length; r++) {
+      const v = parsedRows[r][ci];
+      if (isNaN(v) || v < 1e8) continue;
+      const ts = v;
+      const sec = Math.floor(ts);
+      const ms = Math.round((ts - sec) * 1000);
+      const d = new Date(sec * 1000);
+      if (!isNaN(d.getTime())) {
+        const yy = String(d.getFullYear());
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const hh = String(d.getHours()).padStart(2, '0');
+        const min = String(d.getMinutes()).padStart(2, '0');
+        const ss = String(d.getSeconds()).padStart(2, '0');
+        currentRows[r][ci] = yy + '/' + mm + '/' + dd + ' ' + hh + ':' + min + ':' + ss + '.' + String(ms).padStart(3, '0');
+        parsedRows[r][ci] = NaN;
+      }
+    }
+
+    STEP_FLAGS.timePreprocessed = true;
+    currentHeaders[ci] = currentHeaders[ci] + ' (时间)';
+    renderTable();
+    // 定位到creation_date列居中
+    setTimeout(() => {
+      const wrapper = document.getElementById('tableWrapper');
+      const headers = document.querySelectorAll('#dataTable thead th');
+      for (let i = 0; i < headers.length; i++) {
+        if (headers[i].textContent.includes('creation_date')) {
+          wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+          break;
+        }
+      }
+    }, 100);
+
+    _timeStage = 2;
+    document.getElementById('btnMiss').disabled = false;
+    document.querySelectorAll('.btn-preprocess, .btn-miss, .btn-dup, .btn-outlier, .btn-noise, .btn-norm')
+      .forEach(b => b.classList.remove('active'));
+    document.getElementById('btnTime').classList.add('active');
+    checkExportReady();
+    stopScroll();
+    return;
+  }
+
+  // ====== 第3次及以后：再次定位到creation_date列 ======
+  if (_timeStage >= 2) {
+    const wrapper = document.getElementById('tableWrapper');
+    const headers = document.querySelectorAll('#dataTable thead th');
+    for (let i = 0; i < headers.length; i++) {
+      if (headers[i].textContent.includes('creation_date')) {
+        wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+        break;
+      }
+    }
+    stopScroll();
+  }
 }
 
 // ====== 噪声滤波图表 ======
