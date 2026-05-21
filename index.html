@@ -756,7 +756,7 @@ function highlightMiss() {
 
   // ====== 第2次点击：前一行填充缺失值 ======
   if (_missStage === 1) {
-    coleteyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+    const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
     for (let r = 0; r < parsedRows.length; r++) {
       for (let ci of keyIndices) {
         if (isMissing(r, ci)) {
@@ -1051,6 +1051,7 @@ function checkExportReady() {
   document.getElementById('btnExport').disabled = !ready;
 }
 
+function drawAbnormalChart() {
   // 显示布局容器
   const layout = document.getElementById('abnormalLayout');
   const placeholder = document.getElementById('chartAbnormal').querySelector('.placeholder');

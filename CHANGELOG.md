@@ -168,3 +168,5 @@
   - `detectAllAnomalies()` 函数体内重复出现两次 `const keyIndices`（第二处改为 `let`）
   - `highlightMiss()` 填充阶段中 `const keyIndices` 与同一函数其他路径的声明冲突（改为 `let`）
 - **修复** 恢复数据集选择下拉菜单1-20号选项功能
+- **修复** `highlightMiss()` 中 `coleteyIndices` 拼写错误→`const keyIndices`（缺少声明导致 `ReferenceError`）
+- **修复** `function drawAbnormalChart()` 函数声明在 v3.3.0 重构中丢失，环形图代码悬浮在全局
