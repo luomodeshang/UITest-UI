@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.10</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.11</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -262,7 +262,7 @@ async function stepImport() {
 
   _tableInfo.textContent = '加载中...';
 
-  const csvName = 'uidata' + dsId + '#.csv';
+  const csvName = 'uidata' + dsId + '.csv';
   // 从Pages同域获取CSV文件（避免raw.githubusercontent.com网络慢）
   const url = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/' + csvName;
 
@@ -1127,7 +1127,7 @@ function drawNoiseSignal() {
   // 取211-329行的noise_X数据
   const ni = getColIndex('noise_X');
   if (ni < 0) return;
-  const startRow = 210, endRow = Math.min(329, currentRows.length);
+  const startRow = 299, endRow = Math.min(500, currentRows.length);
   const rawVals = [];
   for (let i = startRow; i < endRow; i++) {
     const v = parsedRows[i][ni];
