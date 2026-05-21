@@ -897,9 +897,8 @@ function drawAbnormalChart() {
     startAngle += angle;
   });
 
-  // 再次遍历，画连线到右侧
+  // 再次遍历，画连线到右侧文本
   startAngle = -Math.PI / 2;
-  const legendItems = document.querySelectorAll('.legend-item');
   items.forEach((item, i) => {
     if (item.val === 0) return;
     const midAngle = startAngle + angles[i] / 2;
@@ -908,7 +907,7 @@ function drawAbnormalChart() {
     const edgeX = cx + Math.cos(midAngle) * radius;
     const edgeY = cy + Math.sin(midAngle) * radius;
 
-    // 右侧文本项的中心Y位置
+    // 右侧文本项的中心Y位置（相对pieContainer）
     const legendEl = document.querySelector('.legend-item[data-type="' + item.type + '"]');
     let targetY = cy; // fallback
     if (legendEl) {
@@ -917,24 +916,26 @@ function drawAbnormalChart() {
       targetY = legendRect.top - layoutRect.top + legendRect.height / 2;
     }
 
-    // X
-    const midX = w * 0.55;
-    const lineEndX = w * 0.50;
-
-    // 曲线连线（贝塞尔）
-    const cp1x = (edgeX + midX) / 2;
-    const cp1y = edgeY;
-    const cp2x = (midX + lineEndX) / 2;
-    const cp2y = targetY;
+    // 折线连接：从饼图边缘→水平右延→垂直弯到文本Y→短水平到文本
+    const pieRight = w * 0.45;
+    const textLeft = pieRight + 8;
 
     ctx.beginPath();
     ctx.moveTo(edgeX, edgeY);
-    ctx.quadraticCurveTo(cp1x, cp1y, lineEndX, targetY);
+    ctx.lineTo(pieRight, edgeY);
+    ctx.lineTo(pieRight, targetY);
+    ctx.lineTo(textLeft, targetY);
     ctx.strokeStyle = item.color;
-    ctx.globalAlpha = 0.4;
-    ctx.lineWidth = 1.2;
+    ctx.globalAlpha = 0.5;
+    ctx.lineWidth = 1.5;
     ctx.stroke();
     ctx.globalAlpha = 1.0;
+
+    // 文本起点小圆点
+    ctx.beginPath();
+    ctx.arc(textLeft, targetY, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = item.color;
+    ctx.fill();
 
     startAngle += angles[i];
   });
@@ -1374,6 +1375,8 @@ function stepQualityReport() {
   if (!currentHeaders || !currentRows.length) { alert('请先导入数据集'); return; }
   // 显示右侧图表
   drawCharts();
+  // 启用时间预处理按钮（数据质量报告完成后可以开始处理）
+  _btnTime.disabled = false;
   $$('.btn-quality,.btn-import,.btn-preprocess,.btn-miss,.btn-dup,.btn-outlier,.btn-noise,.btn-norm')
     .forEach(b => b.classList.remove('active'));
   _btnQuality.classList.add('active');
