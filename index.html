@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.6</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.7</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -40,8 +40,8 @@ body { background:#0a0e17; color:#e0e8f0; font-family:'Microsoft YaHei','PingFan
 .btn-quality.active { background:rgba(6,182,212,.15); border-color:#06b6d4; color:#22d3ee; }
 .btn-miss.active { background:rgba(16,185,129,.15); border-color:#10b981; color:#34d399; }
 .btn-dup.active { background:rgba(245,158,11,.15); border-color:#f59e0b; color:#fbbf24; }
-.btn-outlier.active { background:rgba(217,70,239,.15); border-color:#d946ef; color:#f0abfc; }
-.btn-preprocess.active { background:rgba(139,92,246,.15); border-color:#8b5cf6; color:#a78bfa; }
+.btn-outlier.active { background:rgba(168,85,247,.15); border-color:#a855f7; color:#c084fc; }
+.btn-preprocess.active { background:rgba(6,95,70,.15); border-color:#065f46; color:#34d399; }
 .btn-noise.active { background:rgba(34,211,238,.15); border-color:#22d3ee; color:#67e8f9; }
 .btn-norm.active { background:rgba(251,191,36,.15); border-color:#fbbf24; color:#fcd34d; }
 .center-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#0d111d; }
@@ -66,9 +66,9 @@ td.missing { background:rgba(16,185,129,.25) !important; color:#6ee7b7; }
 td.duplicate { background:rgba(245,158,11,.2) !important; }
 tr.duplicate-row td { background:rgba(245,158,11,.12); }
 tr.duplicate-row:hover td { background:rgba(245,158,11,.2); }
-td.hl-outlier { background:rgba(217,70,239,0.3) !important; color:#f0abfc; }
+td.hl-outlier { background:rgba(168,85,247,0.3) !important; color:#c084fc; }
 td.norm-flash { background:rgba(251,191,36,0.3) !important; color:#fcd34d; transition:background 1s ease; }
-td.outlier { background:rgba(217,70,239,.3) !important; color:#f0abfc; }
+td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
 .right-panel { width:360px; min-width:360px; background:#0f1729; border-left:1px solid #1e3a5f; display:flex; flex-direction:column; padding:16px; }
 .right-panel h3 { font-size:.9rem; color:#64748b; margin-bottom:12px; text-align:center; letter-spacing:2px; border-bottom:1px solid #1e3a5f; padding-bottom:8px; }
 .chart-section { flex:1; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
@@ -141,8 +141,8 @@ td.outlier { background:rgba(217,70,239,.3) !important; color:#f0abfc; }
     <section class="center-panel">
       <div class="table-toolbar">
         <div class="info">数据：<span id="tableInfo">未加载</span></div>
-        <button class="toggle-scroll" id="scrollBtn" onclick="toggleScroll()">⏸ 暂停滚动</button>
-        <button class="toggle-scroll" id="speedBtn" onclick="toggleSpeed()" style="margin-left:8px;">⚡ X2</button>
+        <button class="toggle-scroll" id="speedBtn" onclick="toggleSpeed()">⚡ X2</button>
+        <button class="toggle-scroll" id="scrollBtn" onclick="toggleScroll()" style="margin-left:8px;">⏸ 暂停滚动</button>
       </div>
       <div class="table-wrapper" id="tableWrapper">
         <table id="dataTable"></table>
@@ -262,7 +262,7 @@ async function stepImport() {
 
   const csvName = 'uidata' + dsId + '#.csv';
   // 从Pages同域获取CSV文件（避免raw.githubusercontent.com网络慢）
-  const url = './' + encodeURIComponent(csvName);
+  const url = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/' + csvName;
 
   try {
     const resp = await fetch(url);
@@ -620,16 +620,14 @@ function highlightMiss() {
 
   // ====== 第3次及以后：跳转到第一个缺失值所在列 ======
   if (_missStage >= 2) {
-    // 定位到缺失值所在列居中（用getColIndex获取真实索引）
-    const firstMissRow = Math.min(...missingPos.map(p => p[0]));
-    const firstMissCol = missingPos.filter(p => p[0] === firstMissRow).map(p => p[1])[0];
+    // 定位到缺失值所在列居中（用th文本匹配确保精确）
+    let targetColName = KEY_COLS[0];
     const headers = $$('#dataTable thead th');
-    let ci = firstMissCol;
-    if (ci === undefined || ci < 0) {
-      ci = getColIndex(KEY_COLS[0]);
-    }
-    if (ci >= 0 && ci < headers.length) {
-      _wrapper.scrollLeft = Math.max(0, headers[ci + 1].offsetLeft - _wrapper.clientWidth / 2 + headers[ci + 1].offsetWidth / 2);
+    for (let i = 1; i < headers.length; i++) {
+      if (headers[i].textContent.includes(targetColName)) {
+        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+        break;
+      }
     }
     _wrapper.scrollTop = 0;
     stopScroll();
@@ -686,18 +684,28 @@ function highlightDup() {
     _btnMiss.disabled = true;
     _btnOutlier.disabled = true;
 
+    // 重新计算填充位置索引（删除行后索引偏移）
+    const dupSetSorted = new Set(duplicateRows);
+    function adjustIndex(idx, removed) {
+      let result = idx;
+      for (let r of removed) { if (r < result) result--; }
+      return result;
+    }
+    const adjustedMissCells = _filledMissCells.map(([r, ci]) => [adjustIndex(r, [...dupSetSorted].sort((a,b)=>b-a)), ci]);
+    const adjustedOutlierCells = _filledOutlierCells.map(([r, ci]) => [adjustIndex(r, [...dupSetSorted].sort((a,b)=>b-a)), ci]);
+
     // 重新检测
     detectAllAnomalies();
     renderTable();
-    // 保留已填充的缺失值和异常值背景
+    // 保留已填充的缺失值和异常值背景（使用调整后的索引）
     const dupTableRows = $$('#dataTable tbody tr');
-    _filledMissCells.forEach(([r, ci]) => {
+    adjustedMissCells.forEach(([r, ci]) => {
       if (dupTableRows[r]) {
         const tds = dupTableRows[r].querySelectorAll('td:not(:first-child)');
         if (tds[ci]) tds[ci].classList.add('missing');
       }
     });
-    _filledOutlierCells.forEach(([r, ci]) => {
+    adjustedOutlierCells.forEach(([r, ci]) => {
       if (dupTableRows[r]) {
         const tds = dupTableRows[r].querySelectorAll('td:not(:first-child)');
         if (tds[ci]) tds[ci].classList.add('hl-outlier');
@@ -839,11 +847,14 @@ function highlightOutlier() {
     // 饼图异常值数据清零重绘
     outlierPos = [];
     drawAbnormalChart();
-    // 跳转到第一个异常值列居中
+    // 跳转到第一个异常值列居中（用 th 文本匹配确保精确）
+    let targetColName = KEY_COLS[0];
     const headers = $$('#dataTable thead th');
-    let ci = getColIndex(KEY_COLS[0]);
-    if (ci >= 0 && ci < headers.length) {
-      _wrapper.scrollLeft = Math.max(0, headers[ci + 1].offsetLeft - _wrapper.clientWidth / 2 + headers[ci + 1].offsetWidth / 2);
+    for (let i = 1; i < headers.length; i++) {
+      if (headers[i].textContent.includes(targetColName)) {
+        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+        break;
+      }
     }
     _wrapper.scrollTop = 0;
     stopScroll();
@@ -875,7 +886,7 @@ function drawAbnormalChart() {
   const items = [
     { type: 'dup',  label: '重复值',  val: dupCount,  color: '#f59e0b' },
     { type: 'miss',  label: '缺失值',  val: missCount, color: '#10b981' },
-    { type: 'outlier', label: '异常值', val: outCount,  color: '#d946ef' },
+    { type: 'outlier', label: '异常值', val: outCount,  color: '#a855f7' },
     { type: 'normal', label: '正常',    val: normalCount, color: '#2a3a5c' }
   ];
 
@@ -1251,7 +1262,7 @@ function drawNormChart() {
   const series = [
     { name: 'vibration_X', vals: getSeries(idxX), color: '#22d3ee' },
     { name: 'vibration_Z', vals: getSeries(idxZ), color: '#f59e0b' },
-    { name: 'noise_X', vals: getSeries(idxN), color: '#d946ef' }
+    { name: 'noise_X', vals: getSeries(idxN), color: '#c084fc' }
   ];
 
   // 所有值统一归一化到[0,1]
@@ -1297,13 +1308,13 @@ function drawNormChart() {
 
   drawSeries(idxX, '#22d3ee', 'vibration_X');
   drawSeries(idxZ, '#f59e0b', 'vibration_Z');
-  drawSeries(idxN, '#d946ef', 'noise_X');
+  drawSeries(idxN, '#c084fc', 'noise_X');
 
   // 图例
   const legendItems = [
     { name: 'vibration_X', color: '#22d3ee' },
     { name: 'vibration_Z', color: '#f59e0b' },
-    { name: 'noise_X', color: '#d946ef' }
+    { name: 'noise_X', color: '#c084fc' }
   ];
   let lx = padding.left + 5;
   ctx.font = '11px sans-serif';
@@ -1329,8 +1340,8 @@ function drawNormChart() {
   ctx.textBaseline = 'middle';
   [0, 0.25, 0.5, 0.75, 1].forEach((v, i) => {
     const y = padding.top + (plotH / 4) * i;
-    const actualVal = v * globalRange + globalMin;
-    ctx.fillText(actualVal.toFixed(2), padding.left - 5, y);
+    const fixedVal = (1 - v) * 100;
+    ctx.fillText(fixedVal.toFixed(0), padding.left - 5, y);
   });
 
   ctx.textAlign = 'center';
