@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.11</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.12</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -704,8 +704,6 @@ function highlightDup() {
     }
 
     // 重置标记状态
-    STEP_FLAGS.missingProcessed = false;
-    STEP_FLAGS.outlierProcessed = false;
     _btnMiss.disabled = true;
     _btnOutlier.disabled = true;
 
@@ -857,6 +855,14 @@ function highlightOutlier() {
     duplicateRows = [];
     detectAllAnomalies();
     renderTable();
+    // 异常值已填充单元格保留背景色
+    const outRows = $$('#dataTable tbody tr');
+    _filledOutlierCells.forEach(([r, ci]) => {
+      if (outRows[r]) {
+        const tds = outRows[r].querySelectorAll('td:not(:first-child)');
+        if (tds[ci]) tds[ci].classList.add('hl-outlier');
+      }
+    });
     drawAbnormalChart();
 
     _outlierStage = 2;
