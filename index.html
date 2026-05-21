@@ -357,7 +357,8 @@ async function stepImport() {
 
   // 从GitHub仓库根目录获取CSV文件
   const csvName = 'uidata' + dsId + '#.csv';
-  const url = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/' + csvName;
+  // #在URL中是片段标识符，需要编码
+  const url = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/' + encodeURIComponent(csvName);
 
   try {
     const resp = await fetch(url);
