@@ -170,3 +170,16 @@
 - **修复** 恢复数据集选择下拉菜单1-20号选项功能
 - **修复** `highlightMiss()` 中 `coleteyIndices` 拼写错误→`const keyIndices`（缺少声明导致 `ReferenceError`）
 - **修复** `function drawAbnormalChart()` 函数声明在 v3.3.0 重构中丢失，环形图代码悬浮在全局
+
+
+## [4.0.0] - 2026-05-21
+
+### ♻️ 代码精简（准备新迭代）
+
+- **删除** 第一组重复函数：`detectAllAnomalies`、`renderTable`、`isOutlier`、`isMissing`、`isDuplicateRow`（保留第二组，删第一组 ~400行）
+- **新增** `$(id)` 和 `$$(sel)` 快捷函数，缓存 13 个常用 DOM 引用
+- **精简** 全部 `document.getElementById('xxx')` → `_xxx` 变量引用
+- **精简** 7 处重复 `document.querySelectorAll(...)` → `$$(...)`
+- **压缩** CSS：合并重复规则、移除注释、缩短属性值
+- **行数** 1662 → 1421（-241行）
+- **字符数** 56961 → 51864（-5097字符，减8.9%）
