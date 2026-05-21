@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.5</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.6</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -40,7 +40,7 @@ body { background:#0a0e17; color:#e0e8f0; font-family:'Microsoft YaHei','PingFan
 .btn-quality.active { background:rgba(6,182,212,.15); border-color:#06b6d4; color:#22d3ee; }
 .btn-miss.active { background:rgba(16,185,129,.15); border-color:#10b981; color:#34d399; }
 .btn-dup.active { background:rgba(245,158,11,.15); border-color:#f59e0b; color:#fbbf24; }
-.btn-outlier.active { background:rgba(225,29,72,.15); border-color:#e11d48; color:#fb7185; }
+.btn-outlier.active { background:rgba(217,70,239,.15); border-color:#d946ef; color:#f0abfc; }
 .btn-preprocess.active { background:rgba(139,92,246,.15); border-color:#8b5cf6; color:#a78bfa; }
 .btn-noise.active { background:rgba(34,211,238,.15); border-color:#22d3ee; color:#67e8f9; }
 .btn-norm.active { background:rgba(251,191,36,.15); border-color:#fbbf24; color:#fcd34d; }
@@ -66,9 +66,9 @@ td.missing { background:rgba(16,185,129,.25) !important; color:#6ee7b7; }
 td.duplicate { background:rgba(245,158,11,.2) !important; }
 tr.duplicate-row td { background:rgba(245,158,11,.12); }
 tr.duplicate-row:hover td { background:rgba(245,158,11,.2); }
-td.hl-outlier { background:rgba(225,29,72,0.3) !important; color:#fb7185; }
+td.hl-outlier { background:rgba(217,70,239,0.3) !important; color:#f0abfc; }
 td.norm-flash { background:rgba(251,191,36,0.3) !important; color:#fcd34d; transition:background 1s ease; }
-td.outlier { background:rgba(225,29,72,.3) !important; color:#fb7185; }
+td.outlier { background:rgba(217,70,239,.3) !important; color:#f0abfc; }
 .right-panel { width:360px; min-width:360px; background:#0f1729; border-left:1px solid #1e3a5f; display:flex; flex-direction:column; padding:16px; }
 .right-panel h3 { font-size:.9rem; color:#64748b; margin-bottom:12px; text-align:center; letter-spacing:2px; border-bottom:1px solid #1e3a5f; padding-bottom:8px; }
 .chart-section { flex:1; display:flex; flex-direction:column; gap:12px; overflow-y:auto; }
@@ -130,7 +130,7 @@ td.outlier { background:rgba(225,29,72,.3) !important; color:#fb7185; }
         <button class="btn btn-preprocess" id="btnTime" onclick="stepTimePreprocess()" disabled>⏰ 时间预处理</button>
         <button class="btn btn-miss" id="btnMiss" onclick="highlightMiss()" disabled>🟢 缺失值处理</button>
         <button class="btn btn-dup" id="btnDup" onclick="highlightDup()" disabled>🟠 重复值处理</button>
-        <button class="btn btn-outlier" id="btnOutlier" onclick="highlightOutlier()" disabled>🔴 异常值处理</button>
+        <button class="btn btn-outlier" id="btnOutlier" onclick="highlightOutlier()" disabled>🟪 异常值处理</button>
         <button class="btn btn-noise" id="btnNoise" onclick="stepNoiseFilter()" disabled>🌊 噪声滤波</button>
         <button class="btn btn-norm" id="btnNorm" onclick="stepNormalize()" disabled>📐 归一化处理</button>
         <button class="btn btn-export" id="btnExport" onclick="exportDataset()" disabled>💾 导出数据集</button>
@@ -142,6 +142,7 @@ td.outlier { background:rgba(225,29,72,.3) !important; color:#fb7185; }
       <div class="table-toolbar">
         <div class="info">数据：<span id="tableInfo">未加载</span></div>
         <button class="toggle-scroll" id="scrollBtn" onclick="toggleScroll()">⏸ 暂停滚动</button>
+        <button class="toggle-scroll" id="speedBtn" onclick="toggleSpeed()" style="margin-left:8px;">⚡ X2</button>
       </div>
       <div class="table-wrapper" id="tableWrapper">
         <table id="dataTable"></table>
@@ -194,6 +195,8 @@ let outlierPos = [];        // [[行,列],...] 异常值位置
 let duplicateRows = [];     // [行索引,...] 重复行（第2个及以后的副本）
 let isScrolling = false;
 let scrollTimer = null;
+let scrollSpeedLevel = 1; // 1=X1, 2=X2, 4=X4
+let scrollStep = 1; // 当前帧滚动像素
 let highlightMode = 'none';
 let STEP_FLAGS = {
   imported: false,
@@ -211,6 +214,8 @@ let _dupStage = 0;
 let _outlierStage = 0;
 let _timeStage = 0;
 let _firstDupRow = -1;  // 记录第一个被删除的重复行位置
+let _filledMissCells = []; // 记录已填充的缺失值位置（renderTable后保留背景用）
+let _filledOutlierCells = []; // 记录已填充的异常值位置
 
 // 关键列名（数据质量检测用）
 const KEY_COLS = ['vibration_X', 'vibration_Z', 'noise_X', 'Grating_feedback_X', 'Grating_feedback_Y'];
@@ -464,7 +469,7 @@ function startScroll() {
   _scrollBtn.classList.add('running');
   const wrapper = _wrapper;
   scrollTimer = setInterval(() => {
-    wrapper.scrollTop += 1;
+    wrapper.scrollTop += scrollStep;
     if (wrapper.scrollTop >= wrapper.scrollHeight - wrapper.clientHeight) wrapper.scrollTop = 0;
   }, 25);
 }
@@ -475,6 +480,12 @@ function stopScroll() {
   _scrollBtn.classList.remove('running');
 }
 function toggleScroll() { if (isScrolling) stopScroll(); else startScroll(); }
+function toggleSpeed() {
+  const speedBtn = $('speedBtn');
+  if (scrollSpeedLevel === 1) { scrollSpeedLevel = 2; scrollStep = 2; speedBtn.textContent = '⚡ X2'; }
+  else if (scrollSpeedLevel === 2) { scrollSpeedLevel = 4; scrollStep = 4; speedBtn.textContent = '⚡ X4'; }
+  else { scrollSpeedLevel = 1; scrollStep = 1; speedBtn.textContent = '⚡ X1'; }
+}
 
 // ====== 缺失值处理（绿色） ======
 function highlightMiss() {
@@ -580,6 +591,8 @@ function highlightMiss() {
 
     renderTable();
 
+    // 保存已填充位置供后续保留背景
+    _filledMissCells = filledCells.slice();
     // 给被填充的单元格添加绿色背景
     const tableRows = $$('#dataTable tbody tr');
     filledCells.forEach(([r, ci]) => {
@@ -616,7 +629,7 @@ function highlightMiss() {
       ci = getColIndex(KEY_COLS[0]);
     }
     if (ci >= 0 && ci < headers.length) {
-      _wrapper.scrollLeft = Math.max(0, headers[ci].offsetLeft - _wrapper.clientWidth / 2 + headers[ci].offsetWidth / 2);
+      _wrapper.scrollLeft = Math.max(0, headers[ci + 1].offsetLeft - _wrapper.clientWidth / 2 + headers[ci + 1].offsetWidth / 2);
     }
     _wrapper.scrollTop = 0;
     stopScroll();
@@ -676,6 +689,20 @@ function highlightDup() {
     // 重新检测
     detectAllAnomalies();
     renderTable();
+    // 保留已填充的缺失值和异常值背景
+    const dupTableRows = $$('#dataTable tbody tr');
+    _filledMissCells.forEach(([r, ci]) => {
+      if (dupTableRows[r]) {
+        const tds = dupTableRows[r].querySelectorAll('td:not(:first-child)');
+        if (tds[ci]) tds[ci].classList.add('missing');
+      }
+    });
+    _filledOutlierCells.forEach(([r, ci]) => {
+      if (dupTableRows[r]) {
+        const tds = dupTableRows[r].querySelectorAll('td:not(:first-child)');
+        if (tds[ci]) tds[ci].classList.add('hl-outlier');
+      }
+    });
     drawAbnormalChart();
 
     // 显示原始和当前信息
@@ -777,6 +804,17 @@ function highlightOutlier() {
       }
     }
 
+    // 保存已填充位置
+    _filledOutlierCells = [];
+    const outKeyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+    for (let r = 0; r < parsedRows.length; r++) {
+      for (let ci of outKeyIndices) {
+        // 记录之前是异常值但现在不是的单元格 = 已填充
+        if (_outlierStage === 1 && outlierPos.some(p => p[0]===r && p[1]===ci)) {
+          _filledOutlierCells.push([r, ci]);
+        }
+      }
+    }
     // 重新检测并重绘
     outlierPos = [];
     missingPos = [];
@@ -805,7 +843,7 @@ function highlightOutlier() {
     const headers = $$('#dataTable thead th');
     let ci = getColIndex(KEY_COLS[0]);
     if (ci >= 0 && ci < headers.length) {
-      _wrapper.scrollLeft = Math.max(0, headers[ci].offsetLeft - _wrapper.clientWidth / 2 + headers[ci].offsetWidth / 2);
+      _wrapper.scrollLeft = Math.max(0, headers[ci + 1].offsetLeft - _wrapper.clientWidth / 2 + headers[ci + 1].offsetWidth / 2);
     }
     _wrapper.scrollTop = 0;
     stopScroll();
@@ -837,7 +875,7 @@ function drawAbnormalChart() {
   const items = [
     { type: 'dup',  label: '重复值',  val: dupCount,  color: '#f59e0b' },
     { type: 'miss',  label: '缺失值',  val: missCount, color: '#10b981' },
-    { type: 'outlier', label: '异常值', val: outCount,  color: '#e11d48' },
+    { type: 'outlier', label: '异常值', val: outCount,  color: '#d946ef' },
     { type: 'normal', label: '正常',    val: normalCount, color: '#2a3a5c' }
   ];
 
@@ -1213,7 +1251,7 @@ function drawNormChart() {
   const series = [
     { name: 'vibration_X', vals: getSeries(idxX), color: '#22d3ee' },
     { name: 'vibration_Z', vals: getSeries(idxZ), color: '#f59e0b' },
-    { name: 'noise_X', vals: getSeries(idxN), color: '#fb7185' }
+    { name: 'noise_X', vals: getSeries(idxN), color: '#d946ef' }
   ];
 
   // 所有值统一归一化到[0,1]
@@ -1259,13 +1297,13 @@ function drawNormChart() {
 
   drawSeries(idxX, '#22d3ee', 'vibration_X');
   drawSeries(idxZ, '#f59e0b', 'vibration_Z');
-  drawSeries(idxN, '#fb7185', 'noise_X');
+  drawSeries(idxN, '#d946ef', 'noise_X');
 
   // 图例
   const legendItems = [
     { name: 'vibration_X', color: '#22d3ee' },
     { name: 'vibration_Z', color: '#f59e0b' },
-    { name: 'noise_X', color: '#fb7185' }
+    { name: 'noise_X', color: '#d946ef' }
   ];
   let lx = padding.left + 5;
   ctx.font = '11px sans-serif';
@@ -1284,14 +1322,15 @@ function drawNormChart() {
   ctx.textAlign = 'center';
   ctx.fillText('归一化处理结果 [0, 1]', w / 2, padding.top - 8);
 
-  // Y轴标签
+  // Y轴标签（显示实际数值范围）
   ctx.fillStyle = '#64748b';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   [0, 0.25, 0.5, 0.75, 1].forEach((v, i) => {
     const y = padding.top + (plotH / 4) * i;
-    ctx.fillText(v.toFixed(2), padding.left - 5, y);
+    const actualVal = v * globalRange + globalMin;
+    ctx.fillText(actualVal.toFixed(2), padding.left - 5, y);
   });
 
   ctx.textAlign = 'center';
@@ -1340,27 +1379,31 @@ function stepNormalize() {
     currentHeaders[ci] = currentHeaders[ci] + ' (归一化)';
   }
 
+  // 在列名改名前保存归一化三列的真实索引
+  const _normColIndices = [idxX, idxZ, idxN].filter(idx => idx >= 0);
+
   STEP_FLAGS.normalized = true;
   // 重绘归一化图（列名改名前，传入原始索引）
   drawNormChart();
   renderTable();
 
   // 跳转到三列居中 + 高亮闪烁5秒
-  const normCols = ['vibration_X', 'vibration_Z', 'noise_X'];
-  let normColIndices = normCols.map(n => getColIndex(n)).filter(idx => idx >= 0);
-  if (normColIndices.length > 0) {
+  // 使用列名改名前的索引 _normColIndices（列表改名后getColIndex返回-1）
+  if (_normColIndices.length > 0) {
     // 滚动到中间列居中
-    const midIdx = normColIndices[Math.floor(normColIndices.length / 2)];
+    const midIdx = _normColIndices[Math.floor(_normColIndices.length / 2)];
     const headers = $$('#dataTable thead th');
+    // headers[0]="行" → data列索引为 headers[colIdx + 1]
     if (headers[midIdx + 1]) {
       _wrapper.scrollLeft = Math.max(0, headers[midIdx + 1].offsetLeft - _wrapper.clientWidth / 2 + headers[midIdx + 1].offsetWidth / 2);
     }
     _wrapper.scrollTop = 0;
     // 给三列所有td加高亮class
     const rows = $$('#dataTable tbody tr');
-    rows.forEach((tr, idx) => {
+    rows.forEach((tr, rIdx) => {
+      if (rIdx >= currentRows.length) return;
       const tds = tr.querySelectorAll('td:not(:first-child)');
-      normColIndices.forEach(ci => {
+      _normColIndices.forEach(ci => {
         if (tds[ci]) tds[ci].classList.add('norm-flash');
       });
     });
