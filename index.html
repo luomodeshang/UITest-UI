@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.12</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.13</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -397,8 +397,8 @@ function detectAllAnomalies() {
     if (vals.length < 3) continue;
     const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
     const std = Math.sqrt(vals.reduce((a,b) => a + (b-mean)**2, 0) / vals.length);
-    const lower = mean - 3 * std;
-    const upper = mean + 3 * std;
+    const lower = mean - 5 * std;
+    const upper = mean + 5 * std;
     for (let r = 0; r < parsedRows.length; r++) {
       const v = parsedRows[r][ci];
       if (!isNaN(v) && (v < lower || v > upper)) {
@@ -584,8 +584,8 @@ function highlightMiss() {
       if (vals.length < 3) continue;
       const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
       const std = Math.sqrt(vals.reduce((a,b) => a + (b-mean)**2, 0) / vals.length);
-      const lower = mean - 3 * std;
-      const upper = mean + 3 * std;
+      const lower = mean - 5 * std;
+      const upper = mean + 5 * std;
       for (let r = 0; r < parsedRows.length; r++) {
         const v = parsedRows[r][ci];
         if (!isNaN(v) && (v < lower || v > upper)) outlierPos.push([r, ci]);
