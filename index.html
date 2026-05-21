@@ -1178,10 +1178,13 @@ function drawNormChart() {
     ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
   }
 
-  // 获取三列数据(归一化前)
-  const idxX = getColIndex('vibration_X');
-  const idxZ = getColIndex('vibration_Z');
-  const idxN = getColIndex('noise_X');
+  // 获取三列数据（支持已归一化的列名）
+  let idxX = getColIndex('vibration_X');
+  let idxZ = getColIndex('vibration_Z');
+  let idxN = getColIndex('noise_X');
+  if (idxX < 0) idxX = getColIndex('vibration_X (归一化)');
+  if (idxZ < 0) idxZ = getColIndex('vibration_Z (归一化)');
+  if (idxN < 0) idxN = getColIndex('noise_X (归一化)');
   if (idxX < 0 || idxZ < 0 || idxN < 0) return;
 
   function getSeries(colIdx) {
@@ -1324,12 +1327,12 @@ function stepNormalize() {
   }
 
   STEP_FLAGS.normalized = true;
+  // 重绘归一化图（列名改名前，传入原始索引）
+  drawNormChart();
   renderTable();
   checkExportReady();
   // 归一化处理后导出按钮不可点击
   _btnExport.disabled = true;
-  // 重绘归一化图（只显示处理后的数据）
-  drawNormChart();
 
   $$('.btn-preprocess,.btn-miss,.btn-dup,.btn-outlier,.btn-noise,.btn-norm')
     .forEach(b => b.classList.remove('active'));
