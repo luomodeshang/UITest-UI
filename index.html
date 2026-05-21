@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.0.14</title>
+<title>BroadTech System · 数据质量监控平台 v4.0.15</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -397,8 +397,8 @@ function detectAllAnomalies() {
     if (vals.length < 3) continue;
     const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
     const std = Math.sqrt(vals.reduce((a,b) => a + (b-mean)**2, 0) / vals.length);
-    const lower = mean - 5 * std;
-    const upper = mean + 5 * std;
+    const lower = mean - 3 * std;
+    const upper = mean + 3 * std;
     for (let r = 0; r < parsedRows.length; r++) {
       const v = parsedRows[r][ci];
       if (!isNaN(v) && (v < lower || v > upper)) {
@@ -584,8 +584,8 @@ function highlightMiss() {
       if (vals.length < 3) continue;
       const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
       const std = Math.sqrt(vals.reduce((a,b) => a + (b-mean)**2, 0) / vals.length);
-      const lower = mean - 5 * std;
-      const upper = mean + 5 * std;
+      const lower = mean - 3 * std;
+      const upper = mean + 3 * std;
       for (let r = 0; r < parsedRows.length; r++) {
         const v = parsedRows[r][ci];
         if (!isNaN(v) && (v < lower || v > upper)) outlierPos.push([r, ci]);
@@ -824,34 +824,28 @@ function highlightOutlier() {
         }
       }
       if (vals.length < 3) continue;
-      // 计算中位数
-      vals.sort((a,b) => a - b);
-      const mid = Math.floor(vals.length / 2);
-      const median = vals.length % 2 === 0 ? (vals[mid-1] + vals[mid]) / 2 : vals[mid];
-
-      }
-
-    // 滑动窗口均值填充：对每个异常值，取其前后共6个最近非异常值做均值
-    const halfWindow = 3;
-    const outlierPosForCol = outlierPos.filter(p => p[1] === ci);
-    for (let op of outlierPosForCol) {
-      const row = op[0];
-      // 向前向后各取halfWindow个有效值
-      const neighbors = [];
-      // 向前找
-      for (let offset = 1; neighbors.length < halfWindow && row - offset >= 0; offset++) {
-        const v = parsedRows[row - offset][ci];
-        if (!isNaN(v) && !isOutlier(row - offset, ci)) neighbors.push(v);
-      }
-      // 向后找
-      for (let offset = 1; neighbors.length < halfWindow * 2 && row + offset < parsedRows.length; offset++) {
-        const v = parsedRows[row + offset][ci];
-        if (!isNaN(v) && !isOutlier(row + offset, ci)) neighbors.push(v);
-      }
-      if (neighbors.length > 0) {
-        const winMean = neighbors.reduce((a,b) => a+b, 0) / neighbors.length;
-        parsedRows[row][ci] = winMean;
-        currentRows[row][ci] = winMean.toFixed(4);
+      // 滑动窗口均值填充：对每个异常值，取其前后共6个最近非异常值做均值
+      const halfWindow = 3;
+      const outlierPosForCol = outlierPos.filter(p => p[1] === ci);
+      for (let op of outlierPosForCol) {
+        const row = op[0];
+        // 向前向后各取halfWindow个有效值
+        const neighbors = [];
+        // 向前找
+        for (let offset = 1; neighbors.length < halfWindow && row - offset >= 0; offset++) {
+          const v = parsedRows[row - offset][ci];
+          if (!isNaN(v) && !isOutlier(row - offset, ci)) neighbors.push(v);
+        }
+        // 向后找
+        for (let offset = 1; neighbors.length < halfWindow * 2 && row + offset < parsedRows.length; offset++) {
+          const v = parsedRows[row + offset][ci];
+          if (!isNaN(v) && !isOutlier(row + offset, ci)) neighbors.push(v);
+        }
+        if (neighbors.length > 0) {
+          const winMean = neighbors.reduce((a,b) => a+b, 0) / neighbors.length;
+          parsedRows[row][ci] = winMean;
+          currentRows[row][ci] = winMean.toFixed(4);
+        }
       }
     }
 
