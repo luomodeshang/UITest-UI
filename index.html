@@ -777,7 +777,6 @@ function highlightMiss() {
     }
     // 标记被填充的单元格（保留绿色背景）
     const filledCells = [];
-    const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
     for (let r = 0; r < parsedRows.length; r++) {
       for (let ci of keyIndices) {
         if (isMissing(r, ci)) filledCells.push([r, ci]);
