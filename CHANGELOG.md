@@ -181,6 +181,13 @@
 - **修复** CSV 导入改用 Pages 同域 URL（`./uidata1%23.csv`），替代慢速的 raw.githubusercontent.com
 ## [4.0.0] - 2026-05-21
 
+## [4.0.2] - 2026-05-21
+
+### 🎨 饼图改为实心+连接线
+
+- **修改** 饼图从环形图（donut）改为实心饼图（innerRadius=0）
+- **保留** 每块扇形到右侧图例文本的贝塞尔连线
+
 ### ♻️ 代码精简（准备新迭代）
 
 - **删除** 第一组重复函数：`detectAllAnomalies`、`renderTable`、`isOutlier`、`isMissing`、`isDuplicateRow`（保留第二组，删第一组 ~400行）
