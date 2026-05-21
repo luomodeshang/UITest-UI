@@ -104,7 +104,7 @@ body {
 .btn-export:disabled::before { display:none; }
 .btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
 .btn-import.active { background:rgba(59,130,246,0.15); border-color:#3b82f6; color:#60a5fa; }
-.btn-quality.active { background:rgba(139,92,246,0.15); border-color:#8b5cf6; color:#a78bfa; }
+.btn-quality.active { background:rgba(6,182,212,0.15); border-color:#06b6d4; color:#22d3ee; }
 .btn-miss.active { background:rgba(16,185,129,0.15); border-color:#10b981; color:#34d399; }
 .btn-dup.active { background:rgba(245,158,11,0.15); border-color:#f59e0b; color:#fbbf24; }
 .btn-outlier.active { background:rgba(239,68,68,0.15); border-color:#ef4444; color:#f87171; }
@@ -331,6 +331,12 @@ let STEP_FLAGS = {
   normalized: false
 };
 
+// 三击制阶段变量：0=未点击，1=已定位，2=已处理，3+=跳转
+let _missStage = 0;
+let _dupStage = 0;
+let _outlierStage = 0;
+let _firstDupRow = -1;  // 记录第一个被删除的重复行位置
+
 // 关键列名（数据质量检测用）
 const KEY_COLS = ['vibration_X', 'vibration_Z', 'noise_X', 'Grating_feedback_X', 'Grating_feedback_Y'];
 
@@ -422,6 +428,10 @@ function parseAndLoadCSV(text) {
   STEP_FLAGS.outlierProcessed = false;
   STEP_FLAGS.noiseFiltered = false;
   STEP_FLAGS.normalized = false;
+  _missStage = 0;
+  _dupStage = 0;
+  _outlierStage = 0;
+  _firstDupRow = -1;
   document.getElementById('btnMiss').disabled = true;
   document.getElementById('btnDup').disabled = true;
   document.getElementById('btnOutlier').disabled = true;
@@ -700,34 +710,92 @@ function toggleScroll() { if (isScrolling) stopScroll(); else startScroll(); }
 // ====== 缺失值处理（绿色） ======
 function highlightMiss() {
   highlightMode = 'miss';
-  let minRow = Infinity;
-  const rows = document.querySelectorAll('#dataTable tbody tr');
-  rows.forEach((tr, idx) => {
-    const tds = tr.querySelectorAll('td:not(:first-child)');
-    tds.forEach((td, colIdx) => {
-      if (isMissing(idx, colIdx)) {
-        td.classList.remove('initial-anomaly');
-        td.classList.add('missing');
-        td.classList.add('highlighted');
-        minRow = Math.min(minRow, idx);
-      }
+
+  // ====== 第1次点击：定位到第一个缺失值 ======
+  if (_missStage === 0) {
+    let minRow = Infinity;
+    const rows = document.querySelectorAll('#dataTable tbody tr');
+    rows.forEach((tr, idx) => {
+      const tds = tr.querySelectorAll('td:not(:first-child)');
+      tds.forEach((td, colIdx) => {
+        if (isMissing(idx, colIdx)) {
+          td.classList.remove('initial-anomaly');
+          td.classList.add('missing');
+          td.classList.add('highlighted');
+          minRow = Math.min(minRow, idx);
+        }
+      });
     });
-  });
-  if (minRow < Infinity) {
-    const wrapper = document.getElementById('tableWrapper');
-    const rowHeight = rows[0] ? rows[0].offsetHeight : 30;
-    wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
-    const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
-    for (let ci = 0; ci < tds.length; ci++) {
-      if (isMissing(minRow, ci)) { wrapper.scrollLeft = tds[ci].offsetLeft - 60; break; }
+    if (minRow < Infinity) {
+      const wrapper = document.getElementById('tableWrapper');
+      const rowHeight = rows[0] ? rows[0].offsetHeight : 30;
+      wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
+      const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
+      for (let ci = 0; ci < tds.length; ci++) {
+        if (isMissing(minRow, ci)) { wrapper.scrollLeft = tds[ci].offsetLeft - 60; break; }
+      }
+      _missStage = 1;
+      document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnMiss').classList.add('active');
+      stopScroll();
+    } else {
+      alert('没有找到缺失值');
     }
+    return;
   }
-  document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
-  document.getElementById('btnMiss').classList.add('active');
-  STEP_FLAGS.missingProcessed = true;
-  document.getElementById('btnDup').disabled = false;
-  checkExportReady();
-  stopScroll();
+
+  // ====== 第2次点击：前一行填充缺失值 ======
+  if (_missStage === 1) {
+    const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+    for (let r = 0; r < parsedRows.length; r++) {
+      for (let ci of keyIndices) {
+        if (isMissing(r, ci)) {
+          // 取前一行同一列的值填充（如果前一行不存在或也是NaN，继续往前找）
+          let fillVal = NaN;
+          for (let pr = r - 1; pr >= 0; pr--) {
+            if (!isNaN(parsedRows[pr][ci])) {
+              fillVal = parsedRows[pr][ci];
+              break;
+            }
+          }
+          if (!isNaN(fillVal)) {
+            parsedRows[r][ci] = fillVal;
+            currentRows[r][ci] = String(fillVal);
+          }
+        }
+      }
+    }
+    // 重新检测并重绘
+    missingPos = [];
+    outlierPos = [];
+    duplicateRows = [];
+    detectAllAnomalies();
+    renderTable();
+    // 饼图对应数据清零
+    drawAbnormalChart();
+    _missStage = 2;
+    STEP_FLAGS.missingProcessed = true;
+    document.getElementById('btnDup').disabled = false;
+    checkExportReady();
+    document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
+    document.getElementById('btnMiss').classList.add('active');
+    stopScroll();
+    alert('缺失值已用前一行数据填充');
+    return;
+  }
+
+  // ====== 第3次及以后：跳转到处理过的缺失值位置 ======
+  if (_missStage >= 2) {
+    // 定位到第一个原缺失值位置（已被填充）
+    const rows = document.querySelectorAll('#dataTable tbody tr');
+    if (rows.length > 0) {
+      const wrapper = document.getElementById('tableWrapper');
+      const rowHeight = rows[0].offsetHeight || 30;
+      wrapper.scrollTop = 0;
+      wrapper.scrollLeft = 0;
+    }
+    stopScroll();
+  }
 }
 
 // ====== 重复值处理（删除重复行） ======
@@ -736,72 +804,183 @@ function highlightDup() {
   const initRows = _initialRows || currentRows.length;
   const initCols = _initialCols || currentHeaders.length;
 
-  // 删除重复行（从后往前删，避免索引错乱）
-  const dupSet = new Set(duplicateRows);
-  const sortedDups = [...dupSet].sort((a,b) => b - a);
-  for (let r of sortedDups) {
-    currentRows.splice(r, 1);
-    parsedRows.splice(r, 1);
-  }
-
-  // 重置标记状态（行号已变，所有异常标记需要重算）
-  missingPos = [];
-  outlierPos = [];
-  duplicateRows = [];
-  STEP_FLAGS.missingProcessed = false;
-  STEP_FLAGS.outlierProcessed = false;
-  document.getElementById('btnMiss').disabled = true;
-  document.getElementById('btnOutlier').disabled = true;
-
-  // 重新检测
-  detectAllAnomalies();
-  renderTable();
-  drawAbnormalChart();
-
-  // 在tableInfo显示原始和当前信息
-  const dsId = document.getElementById('datasetSelect').value || '1';
-  document.getElementById('tableInfo').textContent =
-    '数据集 #' + dsId + ' | 当前: ' + currentRows.length + '行 x ' + currentHeaders.length + '列 (原始: ' + initRows + '行 x ' + initCols + '列)';
-
-  STEP_FLAGS.dupProcessed = true;
-  document.getElementById('btnMiss').disabled = false;
-  checkExportReady();
-  stopScroll();
-  document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
-  document.getElementById('btnDup').classList.add('active');
-}
-
-// ====== 异常值处理（红色标记+已处理变蓝） ======
-function highlightOutlier() {
-  highlightMode = 'outlier';
-  let minRow = Infinity;
-  const rows = document.querySelectorAll('#dataTable tbody tr');
-  rows.forEach((tr, idx) => {
-    const tds = tr.querySelectorAll('td:not(:first-child)');
-    tds.forEach((td, colIdx) => {
-      if (isOutlier(idx, colIdx)) {
-        td.classList.remove('initial-anomaly');
-        td.style.backgroundColor = 'rgba(239,68,68,0.3)';
-        td.classList.add('highlighted');
-        minRow = Math.min(minRow, idx);
+  // ====== 第1次点击：定位到第一个重复行 ======
+  if (_dupStage === 0) {
+    if (duplicateRows.length === 0) { alert('没有找到重复行'); return; }
+    const firstDup = Math.min(...duplicateRows);
+    _firstDupRow = firstDup;
+    const wrapper = document.getElementById('tableWrapper');
+    const rows = document.querySelectorAll('#dataTable tbody tr');
+    if (rows.length > 0 && rows[firstDup]) {
+      const rowHeight = rows[0].offsetHeight || 30;
+      wrapper.scrollTop = Math.max(0, firstDup * rowHeight - wrapper.clientHeight / 2);
+    }
+    // 高亮显示重复行
+    rows.forEach((tr, idx) => {
+      if (isDuplicateRow(idx)) {
+        tr.classList.add('duplicate-row');
       }
     });
-  });
-  if (minRow < Infinity) {
-    const wrapper = document.getElementById('tableWrapper');
-    const rowHeight = rows[0] ? rows[0].offsetHeight : 30;
-    wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
-    const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
-    for (let ci = 0; ci < tds.length; ci++) {
-      if (isOutlier(minRow, ci)) { wrapper.scrollLeft = tds[ci].offsetLeft - 60; break; }
-    }
+    _dupStage = 1;
+    document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
+    document.getElementById('btnDup').classList.add('active');
+    stopScroll();
+    return;
   }
-  document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
-  document.getElementById('btnOutlier').classList.add('active');
-  STEP_FLAGS.outlierProcessed = true;
-  document.getElementById('btnNoise').disabled = false;
-  checkExportReady();
-  stopScroll();
+
+  // ====== 第2次点击：物理删除重复行 ======
+  if (_dupStage === 1) {
+    const dupSet = new Set(duplicateRows);
+    const sortedDups = [...dupSet].sort((a,b) => b - a);
+    const deletePos = sortedDups.length > 0 ? sortedDups[sortedDups.length - 1] : 0;
+
+    for (let r of sortedDups) {
+      currentRows.splice(r, 1);
+      parsedRows.splice(r, 1);
+    }
+
+    // 重置标记状态
+    missingPos = [];
+    outlierPos = [];
+    duplicateRows = [];
+    STEP_FLAGS.missingProcessed = false;
+    STEP_FLAGS.outlierProcessed = false;
+    document.getElementById('btnMiss').disabled = true;
+    document.getElementById('btnOutlier').disabled = true;
+
+    // 重新检测
+    detectAllAnomalies();
+    renderTable();
+    drawAbnormalChart();
+
+    // 显示原始和当前信息
+    const dsId = document.getElementById('datasetSelect').value || '1';
+    document.getElementById('tableInfo').textContent =
+      '数据集 #' + dsId + ' | 当前: ' + currentRows.length + '行 x ' + currentHeaders.length + '列 (原始: ' + initRows + '行 x ' + initCols + '列)';
+
+    _dupStage = 2;
+    _firstDupRow = Math.min(_firstDupRow, currentRows.length - 1);
+    STEP_FLAGS.dupProcessed = true;
+    document.getElementById('btnMiss').disabled = false;
+    checkExportReady();
+    document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
+    document.getElementById('btnDup').classList.add('active');
+    stopScroll();
+    alert('已删除 ' + sortedDups.length + ' 行重复数据');
+    return;
+  }
+
+  // ====== 第3次及以后：跳转到之前删除行的位置 ======
+  if (_dupStage >= 2) {
+    const wrapper = document.getElementById('tableWrapper');
+    const rows = document.querySelectorAll('#dataTable tbody tr');
+    if (rows.length > 0) {
+      const targetRow = Math.min(_firstDupRow, rows.length - 1);
+      const rowHeight = rows[0].offsetHeight || 30;
+      wrapper.scrollTop = Math.max(0, targetRow * rowHeight - wrapper.clientHeight / 2);
+      // 高亮该行
+      rows[targetRow].style.background = 'rgba(245,158,11,0.08)';
+      setTimeout(() => { rows[targetRow].style.background = ''; }, 1500);
+    }
+    stopScroll();
+  }
+}
+
+// ====== 异常值处理（三击制：定位→中值填充→跳转） ======
+function highlightOutlier() {
+  highlightMode = 'outlier';
+
+  // ====== 第1次点击：定位到第一个异常值 ======
+  if (_outlierStage === 0) {
+    let minRow = Infinity;
+    let minCol = -1;
+    const rows = document.querySelectorAll('#dataTable tbody tr');
+    rows.forEach((tr, idx) => {
+      const tds = tr.querySelectorAll('td:not(:first-child)');
+      tds.forEach((td, colIdx) => {
+        if (isOutlier(idx, colIdx)) {
+          td.classList.remove('initial-anomaly');
+          td.style.backgroundColor = 'rgba(239,68,68,0.3)';
+          td.classList.add('highlighted');
+          if (idx < minRow) { minRow = idx; minCol = colIdx; }
+        }
+      });
+    });
+    if (minRow < Infinity) {
+      const wrapper = document.getElementById('tableWrapper');
+      const rowHeight = rows[0] ? rows[0].offsetHeight : 30;
+      wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
+      scrolling = false;
+      const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
+      for (let ci = 0; ci < tds.length; ci++) {
+        if (isOutlier(minRow, ci)) { wrapper.scrollLeft = tds[ci].offsetLeft - 60; break; }
+      }
+      _outlierStage = 1;
+      document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
+      document.getElementById('btnOutlier').classList.add('active');
+      stopScroll();
+    } else {
+      alert('没有找到异常值');
+    }
+    return;
+  }
+
+  // ====== 第2次点击：中值填充异常值 ======
+  if (_outlierStage === 1) {
+    const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+    for (let ci of keyIndices) {
+      // 收集该列所有正常值（非NaN且非异常值）
+      const vals = [];
+      for (let r = 0; r < parsedRows.length; r++) {
+        if (!isNaN(parsedRows[r][ci]) && !isOutlier(r, ci)) {
+          vals.push(parsedRows[r][ci]);
+        }
+      }
+      if (vals.length < 3) continue;
+      // 计算中位数
+      vals.sort((a,b) => a - b);
+      const mid = Math.floor(vals.length / 2);
+      const median = vals.length % 2 === 0 ? (vals[mid-1] + vals[mid]) / 2 : vals[mid];
+
+      // 填充异常值
+      for (let r = 0; r < parsedRows.length; r++) {
+        if (isOutlier(r, ci)) {
+          parsedRows[r][ci] = median;
+          currentRows[r][ci] = median.toFixed(4);
+        }
+      }
+    }
+
+    // 重新检测并重绘
+    outlierPos = [];
+    missingPos = [];
+    duplicateRows = [];
+    detectAllAnomalies();
+    renderTable();
+    drawAbnormalChart();
+
+    _outlierStage = 2;
+    STEP_FLAGS.outlierProcessed = true;
+    document.getElementById('btnNoise').disabled = false;
+    checkExportReady();
+    document.querySelectorAll('.btn-miss, .btn-dup, .btn-outlier').forEach(b => b.classList.remove('active'));
+    document.getElementById('btnOutlier').classList.add('active');
+    stopScroll();
+    alert('异常值已用中位数填充');
+    return;
+  }
+
+  // ====== 第3次及以后：跳转到处理过的异常值位置 ======
+  if (_outlierStage >= 2) {
+    const rows = document.querySelectorAll('#dataTable tbody tr');
+    if (rows.length > 0) {
+      const wrapper = document.getElementById('tableWrapper');
+      const rowHeight = rows[0].offsetHeight || 30;
+      wrapper.scrollTop = 0;
+      wrapper.scrollLeft = 0;
+    }
+    stopScroll();
+  }
 }
 
 // ====== 检查导出就绪 ======
@@ -837,9 +1016,11 @@ function drawPie(canvasId, labels, values, colors, total) {
   total = total || values.reduce((a,b) => a+b, 0) || 1;
   let startAngle = -Math.PI / 2;
 
+  const MIN_ANGLE = 0.087; // ~5度，确保极小扇形也可见
   values.forEach((val, i) => {
     if (val === 0) return;
-    const angle = (val / total) * 2 * Math.PI;
+    const rawAngle = (val / total) * 2 * Math.PI;
+    const angle = Math.max(rawAngle, MIN_ANGLE);
     const midAngle = startAngle + angle / 2;
     const pct = (val / total * 100);
     const displayPct = pct < 0.1 ? pct.toFixed(2) : pct.toFixed(1);
@@ -901,7 +1082,7 @@ function drawAbnormalChart() {
   const dupCount = duplicateRows.length;
   const missCount = missingPos.length;
   const outCount = outlierPos.length;
-  labels = ['重复行', '缺失值', '异常值', '正常'];
+  labels = ['重复值', '缺失值', '异常值', '正常'];
   values = [dupCount, missCount, outCount, total - dupCount - missCount - outCount];
   colors = ['#f59e0b', '#10b981', '#ef4444', '#2a3a5c'];
   drawPie('canvasAbnormal', labels, values, colors, total);
