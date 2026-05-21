@@ -16,3 +16,5 @@ __pycache__/
 *.egg-info/
 venv/
 .env
+_analyze_csv.py
+index_v1_backup.html
