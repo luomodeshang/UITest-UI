@@ -629,26 +629,32 @@ function highlightMiss() {
     return;
   }
 
-  // ====== 第3次及以后：跳转到第一个缺失值实际位置 ======
+  // ====== 第3次及以后：跳转到缺失值/异常数据行居中 ======
   if (_missStage >= 2) {
-    // 从missingPos中找到第一个未处理的缺失值
+    // 优先跳转到已填充的缺失值位置（_filledMissCells）
+    // 如果为空则从missingPos取，但仅当该单元格仍显示旧标记（NaN）
     let minRow = Infinity, minCol = -1;
-    for (const [r, ci] of missingPos) {
-      if (r < minRow) { minRow = r; minCol = ci; }
+    if (_filledMissCells.length > 0) {
+      // 用已填充的缺失值位置（第1个被填充的）
+      minRow = _filledMissCells[0][0];
+      minCol = _filledMissCells[0][1];
+    } else {
+      for (const [r, ci] of missingPos) {
+        if (r < minRow) { minRow = r; minCol = ci; }
+      }
     }
-    if (minRow < Infinity) {
+    if (minRow < Infinity && minCol >= 0) {
       const wrapper = _wrapper;
       const rows = $$('#dataTable tbody tr');
       if (rows.length > 0 && rows[minRow]) {
-        const rowHeight = rows[0].offsetHeight || 30;
-        wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
+        wrapper.scrollTop = Math.max(0, rows[minRow].offsetTop - wrapper.clientHeight / 2 + rows[0].offsetHeight);
         const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
         if (tds[minCol]) {
           wrapper.scrollLeft = Math.max(0, tds[minCol].offsetLeft - wrapper.clientWidth / 2 + tds[minCol].offsetWidth / 2);
         }
       }
     } else {
-      // fallback: 跳转到KEY_COLS[0]
+      // fallback: 跳转到KEY_COLS[0]列
       let targetColName = KEY_COLS[0];
       const headers = $$('#dataTable thead th');
       for (let i = 1; i < headers.length; i++) {
@@ -909,29 +915,34 @@ function highlightOutlier() {
     return;
   }
 
-  // ====== 第3次及以后：跳转到异常值实际位置 ======
+  // ====== 第3次及以后：跳转到异常值实际位置居中 ======
   if (_outlierStage >= 2) {
-    // 从outlierPos中找到第一个未处理的异常值（只找仍为NaN的，已填充的不算）
+    // 优先跳转到已填充的异常值位置
+    // 如果为空则从outlierPos中找第一个仍显示紫色标记的异常值（isOutlier判断）
     let minRow = Infinity, minCol = -1;
-    const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
-    for (const [r, ci] of outlierPos) {
-      if (r < minRow && keyIndices.includes(ci) && !isNaN(parsedRows[r][ci])) {
-        minRow = r; minCol = ci;
+    if (_filledOutlierCells.length > 0) {
+      minRow = _filledOutlierCells[0][0];
+      minCol = _filledOutlierCells[0][1];
+    } else {
+      const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+      for (const [r, ci] of outlierPos) {
+        if (r < minRow && keyIndices.includes(ci) && !isNaN(parsedRows[r][ci])) {
+          minRow = r; minCol = ci;
+        }
       }
     }
-    if (minRow < Infinity) {
+    if (minRow < Infinity && minCol >= 0) {
       const wrapper = _wrapper;
       const rows = $$('#dataTable tbody tr');
       if (rows.length > 0 && rows[minRow]) {
-        const rowHeight = rows[0].offsetHeight || 30;
-        wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
+        wrapper.scrollTop = Math.max(0, rows[minRow].offsetTop - wrapper.clientHeight / 2 + rows[0].offsetHeight);
         const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
         if (tds[minCol]) {
           wrapper.scrollLeft = Math.max(0, tds[minCol].offsetLeft - wrapper.clientWidth / 2 + tds[minCol].offsetWidth / 2);
         }
       }
     } else {
-      // fallback: 跳转到KEY_COLS[0]
+      // fallback: 跳转到KEY_COLS[0]列
       let targetColName = KEY_COLS[0];
       const headers = $$('#dataTable thead th');
       for (let i = 1; i < headers.length; i++) {
@@ -1291,7 +1302,7 @@ function stepNoiseFilter() {
   STEP_FLAGS.noiseFiltered = true;
   // noise_X列闪烁
   const noiseCol = getColIndex('noise_X');
-  if (noiseCol >= 0) flashColumns([noiseCol], 5000);
+  if (noiseCol >= 0) flashColumns([noiseCol], 2500);
   _btnNorm.disabled = false;
   checkExportReady();
   $$('.btn-preprocess,.btn-miss,.btn-dup,.btn-outlier,.btn-noise,.btn-norm')
@@ -1503,7 +1514,7 @@ function stepNormalize() {
     }
     _wrapper.scrollTop = 0;
     // 三列闪烁
-    flashColumns(_normColIndices, 5000);
+    flashColumns(_normColIndices, 2500);
   }
 
   checkExportReady();
