@@ -629,18 +629,36 @@ function highlightMiss() {
     return;
   }
 
-  // ====== 第3次及以后：跳转到第一个缺失值所在列 ======
+  // ====== 第3次及以后：跳转到第一个缺失值实际位置 ======
   if (_missStage >= 2) {
-    // 定位到缺失值所在列居中（用th文本匹配确保精确）
-    let targetColName = KEY_COLS[0];
-    const headers = $$('#dataTable thead th');
-    for (let i = 1; i < headers.length; i++) {
-      if (headers[i].textContent.includes(targetColName)) {
-        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
-        break;
-      }
+    // 从missingPos中找到第一个未处理的缺失值
+    let minRow = Infinity, minCol = -1;
+    for (const [r, ci] of missingPos) {
+      if (r < minRow) { minRow = r; minCol = ci; }
     }
-    _wrapper.scrollTop = 0;
+    if (minRow < Infinity) {
+      const wrapper = _wrapper;
+      const rows = $$('#dataTable tbody tr');
+      if (rows.length > 0 && rows[minRow]) {
+        const rowHeight = rows[0].offsetHeight || 30;
+        wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
+        const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
+        if (tds[minCol]) {
+          wrapper.scrollLeft = Math.max(0, tds[minCol].offsetLeft - wrapper.clientWidth / 2 + tds[minCol].offsetWidth / 2);
+        }
+      }
+    } else {
+      // fallback: 跳转到KEY_COLS[0]
+      let targetColName = KEY_COLS[0];
+      const headers = $$('#dataTable thead th');
+      for (let i = 1; i < headers.length; i++) {
+        if (headers[i].textContent.includes(targetColName)) {
+          _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+          break;
+        }
+      }
+      _wrapper.scrollTop = 0;
+    }
     stopScroll();
   }
 }
@@ -891,18 +909,39 @@ function highlightOutlier() {
     return;
   }
 
-  // ====== 第3次及以后：跳转到异常值所在列居中 + 饼图清零 ======
+  // ====== 第3次及以后：跳转到异常值实际位置 ======
   if (_outlierStage >= 2) {
-    // 跳转到异常值处理列居中（不再重绘饼图，stage 2 已清零）
-    let targetColName = KEY_COLS[0];
-    const headers = $$('#dataTable thead th');
-    for (let i = 1; i < headers.length; i++) {
-      if (headers[i].textContent.includes(targetColName)) {
-        _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
-        break;
+    // 从outlierPos中找到第一个未处理的异常值（只找仍为NaN的，已填充的不算）
+    let minRow = Infinity, minCol = -1;
+    const keyIndices = KEY_COLS.map(name => getColIndex(name)).filter(idx => idx >= 0);
+    for (const [r, ci] of outlierPos) {
+      if (r < minRow && keyIndices.includes(ci) && !isNaN(parsedRows[r][ci])) {
+        minRow = r; minCol = ci;
       }
     }
-    _wrapper.scrollTop = 0;
+    if (minRow < Infinity) {
+      const wrapper = _wrapper;
+      const rows = $$('#dataTable tbody tr');
+      if (rows.length > 0 && rows[minRow]) {
+        const rowHeight = rows[0].offsetHeight || 30;
+        wrapper.scrollTop = Math.max(0, minRow * rowHeight - wrapper.clientHeight / 2);
+        const tds = rows[minRow].querySelectorAll('td:not(:first-child)');
+        if (tds[minCol]) {
+          wrapper.scrollLeft = Math.max(0, tds[minCol].offsetLeft - wrapper.clientWidth / 2 + tds[minCol].offsetWidth / 2);
+        }
+      }
+    } else {
+      // fallback: 跳转到KEY_COLS[0]
+      let targetColName = KEY_COLS[0];
+      const headers = $$('#dataTable thead th');
+      for (let i = 1; i < headers.length; i++) {
+        if (headers[i].textContent.includes(targetColName)) {
+          _wrapper.scrollLeft = Math.max(0, headers[i].offsetLeft - _wrapper.clientWidth / 2 + headers[i].offsetWidth / 2);
+          break;
+        }
+      }
+      _wrapper.scrollTop = 0;
+    }
     stopScroll();
   }
 }
@@ -1079,7 +1118,7 @@ function stepTimePreprocess() {
     currentHeaders[ci] = currentHeaders[ci] + ' (时间)';
     renderTable();
     // creation_date列闪烁
-    flashColumns([ci], 5000);
+    flashColumns([ci], 2500);
     // 定位到creation_date列居中
     setTimeout(() => {
       const wrapper = _wrapper;
