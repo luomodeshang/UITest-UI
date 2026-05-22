@@ -26,13 +26,31 @@ body { background:#0a0e17; color:#e0e8f0; font-family:'Microsoft YaHei','PingFan
 .dataset-selector select:hover { border-color:#00d4ff; }
 .dataset-selector select:focus { border-color:#0088ff; box-shadow:0 0 8px rgba(0,136,255,0.3); }
 .btn-group { display:flex; flex-direction:column; gap:10px; width:170px; }
+.btn-flow {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  width:160px;
+  margin:6px auto;
+  padding:6px 0;
+  border-top:1px solid rgba(42,58,92,0.4);
+  border-bottom:1px solid rgba(42,58,92,0.4);
+}
+.btn-flow .btn {
+  padding:5px 0 !important;
+  font-size:.70rem !important;
+  width:100%;
+  background:linear-gradient(135deg,#131b2e,#182238) !important;
+  border-color:#1e2e50 !important;
+  color:#7a8aa0 !important;
+}
 .btn { width:100%; padding:12px 0; background:linear-gradient(135deg,#1a2236,#1e2a45); border:1px solid #2a3a5c; border-radius:8px; color:#94a3b8; font-size:.85rem; cursor:pointer; transition:all .3s; text-align:center; letter-spacing:1px; position:relative; overflow:hidden; }
 .btn:hover { border-color:#00d4ff; color:#fff; box-shadow:0 0 15px rgba(0,212,255,.15); transform:translateX(2px); }
 .btn::before { content:''; position:absolute; left:0; top:0; width:3px; height:100%; background:#00d4ff; transform:scaleY(0); transition:transform .3s; }
 .btn:hover::before { transform:scaleY(1); }
 .btn:active { transform:scale(.97); }
-.btn-import { border-left:3px solid #3b82f6; }
-.btn-export { border-left:3px solid #8b5cf6; }
+.btn-import { border-left:3px solid #3b82f6; padding:14px 0 !important; font-size:.95rem !important; }
+.btn-export { border-left:3px solid #8b5cf6; padding:14px 0 !important; font-size:.95rem !important; }
 .btn-export:disabled { opacity:.4; cursor:not-allowed; transform:none; background:#1a2236; border-color:#1e3a5f; color:#475569; }
 .btn-export:disabled::before { display:none; }
 .btn:disabled { opacity:.4; cursor:not-allowed; transform:none; }
@@ -126,6 +144,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
       </div>
       <div class="btn-group">
         <button class="btn btn-import" onclick="stepImport()">📥 导入数据集</button>
+        <div class="btn-flow">
         <button class="btn btn-quality" id="btnQuality" onclick="stepQualityReport()" disabled>📊 数据质量报告</button>
         <button class="btn btn-preprocess" id="btnTime" onclick="stepTimePreprocess()" disabled>⏰ 时间预处理</button>
         <button class="btn btn-miss" id="btnMiss" onclick="highlightMiss()" disabled>🟢 缺失值处理</button>
@@ -133,6 +152,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
         <button class="btn btn-outlier" id="btnOutlier" onclick="highlightOutlier()" disabled>🟪 异常值处理</button>
         <button class="btn btn-noise" id="btnNoise" onclick="stepNoiseFilter()" disabled>🌊 噪声滤波</button>
         <button class="btn btn-norm" id="btnNorm" onclick="stepNormalize()" disabled>📐 归一化处理</button>
+        </div>
         <button class="btn btn-export" id="btnExport" onclick="exportDataset()" disabled>💾 导出数据集</button>
       </div>
     </aside>
