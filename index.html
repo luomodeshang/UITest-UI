@@ -121,7 +121,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
       <div class="dataset-selector">
         <label>▎数据集选择</label>
         <select id="datasetSelect">
-          <option value="0">随机导入</option>
+          <option value="1" selected>数据集 #1</option>
         </select>
       </div>
       <div class="btn-group">
@@ -244,39 +244,229 @@ function getColIndex(name) {
   return currentHeaders.indexOf(name);
 }
 
+// 20个数据集的缓存
+let _datasetsCache = {};  // {1: {headers, rows, parsedRows, ...}, ...}
+let _loadingDatasets = false;
+
+// 数据集切换事件
+_datasetSelect.addEventListener('change', function() {
+  const dsId = parseInt(this.value);
+  if (!_datasetsCache[dsId]) {
+    _tableInfo.textContent = '缓存中无数据集 #' + dsId + '，请先点击导入';
+    return;
+  }
+  applyDataset(dsId);
+});
+
+function applyDataset(dsId) {
+  const ds = _datasetsCache[dsId];
+  currentHeaders = ds.headers;
+  currentRows = ds.rows;
+  parsedRows = ds.parsedRows;
+  missingPos = ds.missingPos;
+  outlierPos = ds.outlierPos;
+  duplicateRows = ds.duplicateRows;
+  window._initialRows = ds._initialRows;
+  window._initialCols = ds._initialCols;
+
+  // 重置处理步骤
+  STEP_FLAGS.timePreprocessed = false;
+  STEP_FLAGS.missingProcessed = false;
+  STEP_FLAGS.dupProcessed = false;
+  STEP_FLAGS.outlierProcessed = false;
+  STEP_FLAGS.noiseFiltered = false;
+  STEP_FLAGS.normalized = false;
+  _missStage = 0; _dupStage = 0; _outlierStage = 0; _timeStage = 0;
+  _firstDupRow = -1;
+  _btnMiss.disabled = true;
+  _btnDup.disabled = true;
+  _btnOutlier.disabled = true;
+  _btnNoise.disabled = true;
+  _btnNorm.disabled = true;
+  _btnExport.disabled = true;
+
+  renderTable();
+  // 清除旧图表
+  clearCharts();
+  _tableInfo.textContent = '数据集 #' + dsId + ' | ' + currentRows.length + '行 x ' + currentHeaders.length + '列';
+}
+
+function clearCharts() {
+  const canvases = ['canvasAbnormal', 'canvasNoise', 'canvasNorm'];
+  canvases.forEach(id => {
+    const c = document.getElementById(id);
+    if (c) { c.style.display = 'none'; }
+  });
+  ['chartAbnormal', 'chartNoise', 'chartNorm'].forEach(id => {
+    const box = document.getElementById(id);
+    if (box) {
+      const plc = box.querySelector('.placeholder');
+      if (plc) plc.style.display = '';
+    }
+  });
+  const layout = document.getElementById('abnormalLayout');
+  if (layout) layout.style.display = 'none';
+}
+
 (function initSelector() {
   const sel = _datasetSelect;
   for (let i = 1; i <= 20; i++) {
     const opt = document.createElement('option');
     opt.value = i;
     opt.textContent = '数据集 #' + i;
+    if (i === 1) opt.selected = true;
     sel.appendChild(opt);
   }
 })();
 
 // ====== CSV 加载与解析 ======
 async function stepImport() {
-  const sel = _datasetSelect;
-  let dsId = parseInt(sel.value);
-  if (dsId === 0) dsId = Math.floor(Math.random() * 20) + 1;
+  if (_loadingDatasets) return;  // 防止重复点击
 
-  _tableInfo.textContent = '加载中...';
+  _loadingDatasets = true;
+  _tableInfo.textContent = '🔄 正在批量加载20个数据集...';
 
-  const csvName = 'uidata' + dsId + '.csv';
-  // 从Pages同域获取CSV文件（避免raw.githubusercontent.com网络慢）
-  const url = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/' + csvName;
+  const baseUrl = 'https://raw.githubusercontent.com/luomodeshang/UITest-UI/main/';
 
-  try {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const text = await resp.text();
-    parseAndLoadCSV(text);
-    _tableInfo.textContent = '数据集 #' + dsId + ' | ' + currentRows.length + '行 x ' + currentHeaders.length + '列';
-    sel.value = dsId;
-  } catch (e) {
-    _tableInfo.textContent = '❌ 加载失败: ' + csvName;
-    alert('加载失败，请检查文件是否存在: ' + csvName + '\n' + e.message);
+  // 并发请求所有20个CSV
+  const promises = [];
+  for (let i = 1; i <= 20; i++) {
+    const url = baseUrl + 'uidata' + i + '.csv';
+    promises.push(
+      fetch(url).then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' for uidata' + i + '.csv');
+        return r.text();
+      }).then(text => ({ id: i, text }))
+      .catch(err => ({ id: i, error: err.message }))
+    );
   }
+
+  const results = await Promise.all(promises);
+  let successCount = 0;
+  let failCount = 0;
+
+  for (const result of results) {
+    if (result.error) {
+      failCount++;
+      console.warn('数据集 #' + result.id + ' 加载失败: ' + result.error);
+      continue;
+    }
+    // 解析CSV并缓存
+    const parsed = parseCSVToDataset(result.text);
+    if (parsed) {
+      _datasetsCache[result.id] = parsed;
+      successCount++;
+    }
+  }
+
+  _loadingDatasets = false;
+
+  if (successCount === 0) {
+    _tableInfo.textContent = '❌ 所有数据集加载失败';
+    alert('加载失败：无法从GitHub获取CSV文件');
+    return;
+  }
+
+  // 显示第一个成功的数据集
+  const sel = _datasetSelect;
+  const firstId = parseInt(sel.value);
+  if (_datasetsCache[firstId]) {
+    applyDataset(firstId);
+    _tableInfo.textContent = '数据集 #' + firstId + ' | ' + currentRows.length + '行 x ' + currentHeaders.length + '列 | ✅ 共加载 ' + successCount + '/' + 20 + ' 个数据集';
+  } else {
+    // 如果当前选中的加载失败，用第一个成功的
+    const firstSuccessId = Object.keys(_datasetsCache)[0];
+    sel.value = firstSuccessId;
+    applyDataset(parseInt(firstSuccessId));
+    _tableInfo.textContent = '数据集 #' + firstSuccessId + ' | ' + currentRows.length + '行 x ' + currentHeaders.length + '列 | ✅ 共加载 ' + successCount + '/' + 20 + ' 个数据集';
+  }
+
+  _btnQuality.disabled = false;
+}
+
+function parseCSVToDataset(text) {
+  // 按行分割，处理换行符
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(l => l.trim() !== '');
+  if (lines.length < 2) return null;
+
+  const headers = parseCSVLine(lines[0]);
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    rows.push(parseCSVLine(lines[i]));
+  }
+
+  // 确保每行列数一致
+  const numCols = headers.length;
+  const uniformRows = rows.map(row => {
+    while (row.length < numCols) row.push('');
+    return row.slice(0, numCols);
+  });
+
+  // 解析数值
+  const pRows = uniformRows.map(row => row.map(v => {
+    const s = v.trim();
+    if (s === '' || s.toUpperCase() === 'NAN' || s.toUpperCase() === 'N/A' || s.toUpperCase() === 'NULL') return NaN;
+    const n = Number(s);
+    return isNaN(n) ? NaN : n;
+  }));
+
+  // 检测异常
+  const mPos = [];
+  const oPos = [];
+  const dRows = [];
+  let keyIndices = KEY_COLS.map(name => headers.indexOf(name)).filter(idx => idx >= 0);
+  for (let r = 0; r < pRows.length; r++) {
+    for (let ci of keyIndices) {
+      if (isNaN(pRows[r][ci])) {
+        mPos.push([r, ci]);
+      }
+    }
+  }
+
+  // 异常值检测 (3sigma)
+  function calcMean(arr) {
+    let sum = 0, cnt = 0;
+    arr.forEach(v => { if (!isNaN(v)) { sum += v; cnt++; } });
+    return cnt > 0 ? sum / cnt : NaN;
+  }
+  function calcStd(arr, mean) {
+    let sum = 0, cnt = 0;
+    arr.forEach(v => { if (!isNaN(v)) { sum += (v - mean) ** 2; cnt++; } });
+    return cnt > 1 ? Math.sqrt(sum / cnt) : NaN;
+  }
+  for (let ci of keyIndices) {
+    const col = pRows.map(r => r[ci]);
+    const mean = calcMean(col);
+    const std = calcStd(col, mean);
+    if (isNaN(mean) || isNaN(std) || std === 0) continue;
+    for (let r = 0; r < pRows.length; r++) {
+      if (!isNaN(pRows[r][ci]) && Math.abs(pRows[r][ci] - mean) > 3 * std) {
+        oPos.push([r, ci]);
+      }
+    }
+  }
+
+  // 重复行检测
+  const seen = new Map();
+  for (let r = 0; r < uniformRows.length; r++) {
+    const key = uniformRows[r].slice(14, 16).join('|');  // vibration_X, vibration_Z
+    if (seen.has(key)) {
+      dRows.push(r);
+    } else {
+      seen.set(key, r);
+    }
+  }
+
+  return {
+    headers: headers,
+    rows: uniformRows,
+    parsedRows: pRows,
+    missingPos: mPos,
+    outlierPos: oPos,
+    duplicateRows: dRows,
+    _initialRows: uniformRows.length,
+    _initialCols: headers.length
+  };
 }
 
 function parseAndLoadCSV(text) {
