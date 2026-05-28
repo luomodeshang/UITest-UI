@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.1.2</title>
+<title>BroadTech System · 数据质量监控平台 v4.1.1</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -1642,17 +1642,6 @@ window.addEventListener('resize', () => {
   resizeTimer = setTimeout(() => {
     if (STEP_FLAGS.imported && _btnQuality.classList.contains('active')) drawCharts();
   }, 300);
-});
-
-// ====== ESC退出全屏 ======
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    if (document.fullscreenElement) {
-      document.exitFullscreen();
-    } else if (document.webkitFullscreenElement) {
-      document.webkitExitFullscreen();
-    }
-  }
 });
 </script>
 </body>
