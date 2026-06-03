@@ -461,3 +461,9 @@
 
 - **调整** "BroadTech System"文字向上平移20px（padding-top:35px→15px）
 - **调整** "BroadTech System"文字向左平移20px（margin-left:-20px）
+
+## [4.1.13] - 2026-05-22
+
+### 🎨 UI微调
+
+- **调整** "BroadTech System"文字向右平移3px（margin-left:-20px→-17px）
