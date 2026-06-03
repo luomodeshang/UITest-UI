@@ -467,3 +467,11 @@
 ### 🎨 UI微调
 
 - **调整** "BroadTech System"文字向右平移3px（margin-left:-20px→-17px）
+
+## [4.1.14] - 2026-05-22
+
+### 🏗 结构重构
+
+- **重构** 图标和文字打包为 `.top-bar__brand-inner` 整体容器
+- **新增** `transform:scale(1)` 整体缩放控制点
+- **迁移** 所有像素微调（margin-left、padding-top）到 brand-inner 层级
