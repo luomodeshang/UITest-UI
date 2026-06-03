@@ -441,3 +441,10 @@
 
 - **调整** BK图标右移15px（margin-left:5px→15px）
 - **调整** "BroadTech System"文字下移5px（margin-bottom:5px→0px）
+
+## [4.1.9] - 2026-05-22
+
+### 🎨 UI微调
+
+- **调整** BK图标右移30px（margin-left:15px→30px）
+- **调整** "BroadTech System"文字下移15px（padding-top:10px）
