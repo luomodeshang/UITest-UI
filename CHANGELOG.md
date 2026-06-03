@@ -427,3 +427,10 @@
 ### 🎨 UI调整
 
 - **调整** BK图标高度从32px放大到64px（100%放大）
+
+## [4.1.7] - 2026-05-22
+
+### 🎨 UI微调
+
+- **调整** BK图标右移5px（margin-left:5px）
+- **调整** "BroadTech System"文字下移2px（margin-bottom:5px→3px）
