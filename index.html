@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.4.0</title>
+<title>BroadTech System · 数据质量监控平台 v4.4.1</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -1072,6 +1072,11 @@ function highlightOutlier() {
     drawNoiseSignal();
     drawNormChart();
 
+    // 保存异常值处理后的数据快照（供"处理后数据质量报告"对比使用）
+    window._outlierSnapshotRows = currentRows.map(function(r) { return r.slice(); });
+    window._outlierSnapshotParsed = parsedRows.map(function(r) { return r.slice(); });
+    window._outlierSnapshotHeaders = currentHeaders ? currentHeaders.slice() : null;
+
     _outlierStage = 2;
     STEP_FLAGS.outlierProcessed = true;
     _btnNoise.disabled = false;
@@ -2062,13 +2067,13 @@ function drawAfterReport() {
   );
   drawAfterReportPie(
     document.getElementById('canvasFinalPie'),
-    currentHeaders,
-    currentRows,
-    parsedRows,
-    '处理后数据'
+    window._outlierSnapshotHeaders || currentHeaders,
+    window._outlierSnapshotRows || currentRows,
+    window._outlierSnapshotParsed || parsedRows,
+    '异常值处理后'
   );
-  drawAfterReportNoise(document.getElementById('canvasAfterNoise'));
-  drawAfterReportNorm(document.getElementById('canvasBeforeNorm'), 'initial', '归一化前（原始数据）');
+  drawNoiseSignal(document.getElementById('canvasAfterNoise'));
+  drawAfterReportNorm(document.getElementById('canvasBeforeNorm'), 'outlier', '归一化前（异常值处理后）');
   drawAfterReportNorm(document.getElementById('canvasAfterNorm'), 'after', '归一化后（[0,1]范围）');
 }
 
@@ -2302,7 +2307,7 @@ function drawAfterReportNoise(canvas) {
 // ====== 绘制归一化折线图（用于处理后报告弹窗） ======
 function drawAfterReportNorm(canvas, dataSource, title) {
   if (!canvas) return;
-  var dataArr = (dataSource === 'initial' && window._snapshotParsed) ? window._snapshotParsed : parsedRows;
+  var dataArr = (dataSource === 'initial' && window._snapshotParsed) ? window._snapshotParsed : (dataSource === 'outlier' && window._outlierSnapshotParsed) ? window._outlierSnapshotParsed : parsedRows;
   var colPrefix = (dataSource === 'initial') ? '' : '';
 
   var idxX = getColIndex('vibration_X');
@@ -2414,7 +2419,7 @@ function drawAfterReportNorm(canvas, dataSource, title) {
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
   ctx.font = '10px sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(title || (dataSource === 'initial' ? '归一化前（原始数据）' : '归一化后（[0,1]范围）'), w / 2, padding.top - 25);
+  ctx.fillText(title || (dataSource === 'initial' ? '归一化前（原始数据）' : dataSource === 'outlier' ? '归一化前（异常值处理后）' : '归一化后（[0,1]范围）'), w / 2, padding.top - 25);
 
   // Y轴标签
   ctx.fillStyle = '#64748b';
@@ -2438,7 +2443,7 @@ function drawAfterReportNorm(canvas, dataSource, title) {
 }
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.4.0");
+console.log("BroadTech System · 数据质量监控平台 v4.4.1");
 </script>
 </body>
 </html>
