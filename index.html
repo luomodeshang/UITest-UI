@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.3.0</title>
+<title>BroadTech System · 数据质量监控平台 v4.3.1</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -1435,7 +1435,7 @@ function drawNoiseSignal(targetCanvas) {
 
   function mapX(i) { return padding.left + (i / (N - 1)) * plotW; }
   function mapY(y) { return padding.top + (1 - (y - yMin) / yRange) * plotH; }
-  if (targetCanvas) _modalLineData = { type: 'noise', N, mapX: mapX.toString(), mapY: mapY.toString(), yMin, yRange, rawVals: rawVals.slice(), filteredVals: noiseFiltered ? filteredVals.slice() : null };
+  if (targetCanvas) _modalLineData = { type: 'noise', N, mapX: mapX.toString(), mapY: mapY.toString(), yMin, yRange, padding: {top:padding.top, bottom:padding.bottom, left:padding.left, right:padding.right}, rawVals: rawVals.slice(), filteredVals: noiseFiltered ? filteredVals.slice() : null };
 
   // 原始信号
   ctx.strokeStyle = 'rgba(148,163,184,0.5)';
@@ -1615,7 +1615,7 @@ function drawNormChart(targetCanvas) {
   const globalRange = globalMax - globalMin || 1;
 
   const N = currentRows.length;
-  if (targetCanvas) _modalLineData = { type: 'norm', N, globalMin, globalRange, series: series.map(s => ({name: s.name, color: s.color, vals: s.vals.slice()})) };
+  if (targetCanvas) _modalLineData = { type: 'norm', N, globalMin, globalRange, padding: {top:padding.top, bottom:padding.bottom, left:padding.left, right:padding.right}, series: series.map(s => ({name: s.name, color: s.color, vals: s.vals.slice()})) };
 
   function mapY(val) {
     const norm = (val - globalMin) / globalRange;
@@ -1849,11 +1849,11 @@ function _bindLineTooltip(canvas) {
 
     if (data.type === 'noise') {
       // 噪声滤波
-      const padding = { top: 30, bottom: 25, left: 40, right: 20 };
-      const plotW = w - padding.left - padding.right;
-      const plotH = h - padding.top - padding.bottom;
-      if (mx < padding.left || mx > w - padding.right) { tooltip.style.display = 'none'; return; }
-      const idx = Math.round((mx - padding.left) / plotW * (data.rawVals.length - 1));
+      const p = data.padding || { top: 30, bottom: 25, left: 40, right: 20 };
+      const plotW = w - p.left - p.right;
+      const plotH = h - p.top - p.bottom;
+      if (mx < p.left || mx > w - p.right) { tooltip.style.display = 'none'; return; }
+      const idx = Math.round((mx - p.left) / plotW * (data.rawVals.length - 1));
       if (idx < 0 || idx >= data.rawVals.length) { tooltip.style.display = 'none'; return; }
       const rawV = data.rawVals[idx];
       let tip = '原始 noise_X: ' + rawV.toFixed(4);
@@ -1866,17 +1866,16 @@ function _bindLineTooltip(canvas) {
       tooltip.style.top = (e.clientY - 10) + 'px';
     } else if (data.type === 'norm') {
       // 归一化
-      const padding = { top: 30, bottom: 30, left: 45, right: 20 };
-      const plotW = w - padding.left - padding.right;
-      const plotH = h - padding.top - padding.bottom;
-      if (mx < padding.left || mx > w - padding.right) { tooltip.style.display = 'none'; return; }
+      const p = data.padding || { top: 30, bottom: 30, left: 45, right: 20 };
+      const plotW = w - p.left - p.right;
+      const plotH = h - p.top - p.bottom;
+      if (mx < p.left || mx > w - p.right) { tooltip.style.display = 'none'; return; }
       let tip = '';
       data.series.forEach(s => {
-        const idx = Math.round((mx - padding.left) / plotW * (s.vals.length - 1));
+        const idx = Math.round((mx - p.left) / plotW * (s.vals.length - 1));
         if (idx >= 0 && idx < s.vals.length) {
           const v = s.vals[idx];
-          const normV = (v - data.globalMin) / data.globalRange;
-          tip += '<span style="color:' + s.color + '">' + s.name + ': ' + v.toFixed(4) + ' (' + normV.toFixed(3) + ')</span><br>';
+          tip += '<span style="color:' + s.color + '">' + s.name + ': ' + v.toFixed(4) + '</span><br>';
         }
       });
       if (tip) {
@@ -1967,7 +1966,7 @@ window.addEventListener('resize', () => {
 });
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.3.0");
+console.log("BroadTech System · 数据质量监控平台 v4.3.1");
 </script>
 </body>
 </html>
