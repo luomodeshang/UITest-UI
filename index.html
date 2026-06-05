@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.2.9</title>
+<title>BroadTech System · 数据质量监控平台 v4.3.0</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -1402,7 +1402,6 @@ function drawNoiseSignal(targetCanvas) {
   if (rawVals.length < 2) return;
 
   const N = rawVals.length;
-  if (targetCanvas) _modalLineData = { type: 'noise', N, mapX: mapX.toString(), mapY: mapY.toString(), yMin, yRange, rawVals: rawVals.slice(), filteredVals: noiseFiltered ? filteredVals.slice() : null };
 
   // 高斯滤波（窗口=5, σ=1.5）
   const gaussKernel = [0.061, 0.242, 0.383, 0.242, 0.061];
@@ -1436,6 +1435,7 @@ function drawNoiseSignal(targetCanvas) {
 
   function mapX(i) { return padding.left + (i / (N - 1)) * plotW; }
   function mapY(y) { return padding.top + (1 - (y - yMin) / yRange) * plotH; }
+  if (targetCanvas) _modalLineData = { type: 'noise', N, mapX: mapX.toString(), mapY: mapY.toString(), yMin, yRange, rawVals: rawVals.slice(), filteredVals: noiseFiltered ? filteredVals.slice() : null };
 
   // 原始信号
   ctx.strokeStyle = 'rgba(148,163,184,0.5)';
@@ -1507,12 +1507,12 @@ function drawNoiseSignal(targetCanvas) {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = fs(10);
     ctx.textAlign = 'center';
-    ctx.fillText('噪声滤波 (高斯滤波, σ=1.5)', w / 2, padding.top - 8);
+    ctx.fillText('噪声滤波', w / 2, padding.top - 8);
   } else {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = fs(10);
     ctx.textAlign = 'center';
-    ctx.fillText('噪声滤波曲线', w / 2, padding.top - 8);
+    ctx.fillText('噪声滤波', w / 2, padding.top - 8);
   }
 
   // Y轴
@@ -1592,8 +1592,6 @@ function drawNormChart(targetCanvas) {
   if (idxN < 0) idxN = getColIndex('noise_X (归一化)');
   if (idxX < 0 || idxZ < 0 || idxN < 0) return;
 
-  if (targetCanvas) _modalLineData = { type: 'norm', N, globalMin, globalRange, series: series.map(s => ({name: s.name, color: s.color, vals: s.vals.slice()})) };
-
   function getSeries(colIdx) {
     const vals = [];
     for (let r = 0; r < parsedRows.length; r++) {
@@ -1617,6 +1615,7 @@ function drawNormChart(targetCanvas) {
   const globalRange = globalMax - globalMin || 1;
 
   const N = currentRows.length;
+  if (targetCanvas) _modalLineData = { type: 'norm', N, globalMin, globalRange, series: series.map(s => ({name: s.name, color: s.color, vals: s.vals.slice()})) };
 
   function mapY(val) {
     const norm = (val - globalMin) / globalRange;
@@ -1968,7 +1967,7 @@ window.addEventListener('resize', () => {
 });
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.2.9");
+console.log("BroadTech System · 数据质量监控平台 v4.3.0");
 </script>
 </body>
 </html>
