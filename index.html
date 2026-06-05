@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.3.2</title>
+<title>BroadTech System · 数据质量监控平台 v4.4.0</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -62,6 +62,7 @@ body { background:#0a0e17; color:#e0e8f0; font-family:'Microsoft YaHei','PingFan
 .btn-preprocess.active { background:rgba(13,148,136,.15); border-color:#0d9488; color:#2dd4bf; }
 .btn-noise.active { background:rgba(34,211,238,.15); border-color:#22d3ee; color:#67e8f9; }
 .btn-norm.active { background:rgba(251,191,36,.15); border-color:#fbbf24; color:#fcd34d; }
+.btn-after-quality.active { background:rgba(239,68,68,.15); border-color:#ef4444; color:#f87171; }
 .center-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; background:#0d111d; }
 .table-toolbar { height:44px; min-height:44px; display:flex; align-items:center; justify-content:space-between; padding:0 16px; background:#111827; border-bottom:1px solid #1e3a5f; }
 .table-toolbar .info { font-size:.8rem; color:#64748b; }
@@ -111,6 +112,26 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
 .modal-body { width:92%; flex:1; max-width:1400px; max-height:85vh; position:relative; display:flex; flex-direction:row; height:100%; }
 .modal-body .modal-canvas-wrap { flex:1; min-width:0; height:100%; display:flex; }
 .modal-body .modal-canvas-wrap canvas { width:100%; height:100%; display:block; }
+/* 处理后数据质量报告弹窗 */
+.after-report-modal { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,.85); z-index:10000; display:none; flex-direction:column; align-items:center; justify-content:center; }
+.after-report-header { display:flex; align-items:center; justify-content:space-between; width:90%; max-width:1400px; padding:12px 0; }
+.after-report-header h3 { color:#e0e8f0; font-size:1.1rem; letter-spacing:2px; margin:0; border:none; padding:0; }
+.after-report-close-btn { padding:8px 24px; border-radius:6px; font-size:14px; cursor:pointer; background:rgba(239,68,68,.12); border:1px solid #ef4444; color:#ef4444; transition:all .3s; }
+.after-report-close-btn:hover { background:rgba(239,68,68,.3); }
+.after-report-body { width:90%; flex:1; max-width:1400px; max-height:85vh; display:flex; flex-direction:column; gap:8px; overflow:hidden; }
+.after-report-row { flex:1; display:flex; min-height:0; gap:8px; }
+.after-report-row:first-child { flex:0 0 calc(100% / 3); }
+.after-report-row:nth-child(2) { flex:0 0 calc(100% / 3); }
+.after-report-row:nth-child(3) { flex:0 0 calc(100% / 3); }
+.after-report-pie-box { flex:1; display:flex; flex-direction:column; background:#111827; border:1px solid #1e3a5f; border-radius:8px; overflow:hidden; padding:4px; position:relative; }
+.after-report-pie-title { text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px; }
+.after-report-pie-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
+.after-report-noise-box { flex:1; display:flex; flex-direction:column; background:#111827; border:1px solid #1e3a5f; border-radius:8px; overflow:hidden; padding:4px; }
+.after-report-noise-box canvas { flex:1; width:100%; height:100%; }
+.after-report-norm-box { flex:1; display:flex; flex-direction:column; background:#111827; border:1px solid #1e3a5f; border-radius:8px; overflow:hidden; padding:4px; position:relative; }
+.after-report-norm-title { text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px; }
+.after-report-norm-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
+
 
 .bottom-bar { height:44px; min-height:44px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#0f1729 0%,#1a2744 100%); border-top:1px solid #1e3a5f; }
 .bottom-bar__title { font-size:1.25rem; font-weight:600; color:#fff; letter-spacing:4px; }
@@ -162,6 +183,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
         <button class="btn btn-noise" id="btnNoise" onclick="stepNoiseFilter()" disabled>🌊 噪声滤波</button>
         <button class="btn btn-norm" id="btnNorm" onclick="stepNormalize()" disabled>📐 归一化处理</button>
         </div>
+        <button class="btn btn-after-quality" id="btnAfterQuality" onclick="openAfterQualityReport()" disabled>📋 处理后数据质量报告</button>
         <button class="btn btn-export" id="btnExport" onclick="exportDataset()" disabled>💾 导出数据集</button>
       </div>
     </aside>
@@ -234,6 +256,44 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
     </div>
   </div>
 
+  <!-- ===== 处理后数据质量报告弹窗 ===== -->
+  <div class="after-report-modal" id="afterReportModal">
+    <div class="after-report-header">
+      <h3>📋 处理后数据质量报告</h3>
+      <button class="after-report-close-btn" onclick="closeAfterReport()">✕ 关闭</button>
+    </div>
+    <div class="after-report-body" id="afterReportBody">
+      <!-- 第一行：两个饼图并排 -->
+      <div class="after-report-row">
+        <div class="after-report-pie-box">
+          <div class="after-report-pie-title">初始数据</div>
+          <canvas id="canvasInitPie"></canvas>
+        </div>
+        <div class="after-report-pie-box">
+          <div class="after-report-pie-title">处理后数据</div>
+          <canvas id="canvasFinalPie"></canvas>
+        </div>
+      </div>
+      <!-- 第二行：噪声滤波折线图 -->
+      <div class="after-report-row">
+        <div class="after-report-noise-box">
+          <canvas id="canvasAfterNoise"></canvas>
+        </div>
+      </div>
+      <!-- 第三行：两个归一化折线图并排 -->
+      <div class="after-report-row">
+        <div class="after-report-norm-box">
+          <div class="after-report-norm-title">归一化前（原始数据）</div>
+          <canvas id="canvasBeforeNorm"></canvas>
+        </div>
+        <div class="after-report-norm-box">
+          <div class="after-report-norm-title">归一化后（[0,1]范围）</div>
+          <canvas id="canvasAfterNorm"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== 底部 ===== -->
   <footer class="bottom-bar">
     <span class="bottom-bar__title">手搓数据 智驭未来</span>
@@ -286,6 +346,7 @@ const _btnOutlier = $('btnOutlier');
 const _btnExport = $('btnExport');
 const _btnNoise = $('btnNoise');
 const _btnNorm = $('btnNorm');
+const _btnAfterQuality = $('btnAfterQuality');
 const _btnQuality = $('btnQuality');
 const _btnTime = $('btnTime');
 const _datasetSelect = $('datasetSelect');
@@ -324,7 +385,7 @@ async function stepImport() {
   _filledMissCells = []; _filledOutlierCells = [];
   _btnQuality.disabled = true; _btnTime.disabled = true;
   _btnMiss.disabled = true; _btnDup.disabled = true; _btnOutlier.disabled = true;
-  _btnNoise.disabled = true; _btnNorm.disabled = true; _btnExport.disabled = true;
+  _btnNoise.disabled = true; _btnNorm.disabled = true; _btnExport.disabled = true; document.getElementById('btnAfterQuality').disabled = true;
   $$('.btn').forEach(b => b.classList.remove('active'));
   if (isScrolling) stopScroll();
 
@@ -381,6 +442,11 @@ function parseAndLoadCSV(text) {
     return isNaN(n) ? NaN : n;
   }));
 
+  // 保存初始数据快照（供"处理后数据质量报告"对比使用）
+  window._snapshotRows = currentRows.map(r => [...r]);
+  window._snapshotParsed = parsedRows.map(r => [...r]);
+  window._snapshotHeaders = [...currentHeaders];
+
   // 检测所有异常
   detectAllAnomalies();
   renderTable();
@@ -415,6 +481,7 @@ function parseAndLoadCSV(text) {
   _btnNoise.disabled = true;
   _btnNorm.disabled = true;
   _btnExport.disabled = true;
+  _btnAfterQuality.disabled = true;
 
   startScroll();
 }
@@ -1790,6 +1857,7 @@ function stepNormalize() {
   $$('.btn-preprocess,.btn-miss,.btn-dup,.btn-outlier,.btn-noise,.btn-norm')
     .forEach(b => b.classList.remove('active'));
   _btnNorm.classList.add('active');
+  document.getElementById('btnAfterQuality').disabled = false;
 }
 
 // ====== 数据质量报告 ======
@@ -1932,6 +2000,9 @@ function redrawModalChart() {
 // 弹窗 resize
 window.addEventListener('resize', () => {
   if (modalChartType) redrawModalChart();
+  if (document.getElementById('afterReportModal').style.display === 'flex') {
+    drawAfterReport();
+  }
 });
 // ====== 导出 ======
 function exportDataset() {
@@ -1966,8 +2037,408 @@ window.addEventListener('resize', () => {
   }, 300);
 });
 
+
+// ====== 处理后数据质量报告 ======
+function openAfterQualityReport() {
+  if (!STEP_FLAGS.imported) { alert('请先导入数据集'); return; }
+  if (!STEP_FLAGS.normalized) { alert('请先完成所有步骤（归一化处理）后再查看报告'); return; }
+  document.getElementById('afterReportModal').style.display = 'flex';
+  setTimeout(function() { drawAfterReport(); }, 100);
+}
+
+function closeAfterReport() {
+  document.getElementById('afterReportModal').style.display = 'none';
+}
+
+function drawAfterReport() {
+  // 只有在有快照数据时才绘制
+  if (!window._snapshotParsed || !window._snapshotHeaders) return;
+  drawAfterReportPie(
+    document.getElementById('canvasInitPie'),
+    window._snapshotHeaders,
+    window._snapshotRows,
+    window._snapshotParsed,
+    '初始数据'
+  );
+  drawAfterReportPie(
+    document.getElementById('canvasFinalPie'),
+    currentHeaders,
+    currentRows,
+    parsedRows,
+    '处理后数据'
+  );
+  drawAfterReportNoise(document.getElementById('canvasAfterNoise'));
+  drawAfterReportNorm(document.getElementById('canvasBeforeNorm'), 'initial', '归一化前（原始数据）');
+  drawAfterReportNorm(document.getElementById('canvasAfterNorm'), 'after', '归一化后（[0,1]范围）');
+}
+
+// ====== 绘制单个饼图（用于处理后报告弹窗） ======
+function drawAfterReportPie(canvas, headers, rows, parsed, title) {
+  if (!canvas || !headers || !rows || !parsed) return;
+  var reportMissingPos = [];
+  var reportOutlierPos = [];
+  var reportDuplicateRows = [];
+
+  // 用传入的数据检测异常（独立检测，不影响全局状态）
+  var keyIndices = KEY_COLS.map(function(name) { return headers.indexOf(name); }).filter(function(idx) { return idx >= 0; });
+  // 缺失值检测
+  for (var r = 0; r < parsed.length; r++) {
+    for (var ci = 0; ci < keyIndices.length; ci++) {
+      var k = keyIndices[ci];
+      if (k >= 0 && isNaN(parsed[r][k])) {
+        reportMissingPos.push([r, k]);
+      }
+    }
+  }
+  // 异常值检测
+  for (var ci = 0; ci < keyIndices.length; ci++) {
+    var k = keyIndices[ci];
+    if (k < 0) continue;
+    var vals = [];
+    for (var r = 0; r < parsed.length; r++) {
+      var v = parsed[r][k];
+      if (!isNaN(v)) vals.push(v);
+    }
+    if (vals.length < 3) continue;
+    var mean = vals.reduce(function(a,b) { return a+b; }, 0) / vals.length;
+    var std = Math.sqrt(vals.reduce(function(a,b) { return a + (b-mean)*(b-mean); }, 0) / vals.length);
+    var lower = mean - 3 * std;
+    var upper = mean + 3 * std;
+    for (var r = 0; r < parsed.length; r++) {
+      var v = parsed[r][k];
+      if (!isNaN(v) && (v < lower || v > upper)) {
+        reportOutlierPos.push([r, k]);
+      }
+    }
+  }
+  // 重复行检测
+  var seen = {};
+  for (var r = 0; r < rows.length; r++) {
+    var key = rows[r].join('\\x00');
+    if (key in seen) {
+      reportDuplicateRows.push(r);
+    } else {
+      seen[key] = r;
+    }
+  }
+
+  var dupCount = reportDuplicateRows.length;
+  var missCount = reportMissingPos.length;
+  var outCount = reportOutlierPos.length;
+  var total = rows.length;
+  var normalCount = total > 0 ? total - dupCount - missCount - outCount : 0;
+
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  var dpr = window.devicePixelRatio || 1;
+  var rect = canvas.parentElement ? canvas.parentElement.getBoundingClientRect() : { width: 300, height: 300 };
+  // Use the canvas own sizing
+  var w = canvas.parentElement.clientWidth || 300;
+  var h = canvas.parentElement.clientHeight - 20 || 280;
+  if (w < 10) w = 300;
+  if (h < 10) h = 280;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+
+  ctx.clearRect(0, 0, w, h);
+
+  var cx = w / 2, cy = h / 2;
+  var radius = Math.min(w, h) / 2 - 15;
+  var innerRadius = 0;
+  var MIN_ANGLE = 0.087;
+
+  var items = [
+    { type: 'miss',  label: '缺失值',  val: missCount, color: '#10b981' },
+    { type: 'dup',   label: '重复值',  val: dupCount,  color: '#f59e0b' },
+    { type: 'outlier', label: '异常值', val: outCount,  color: '#a855f7' },
+    { type: 'normal', label: '正常',    val: normalCount, color: '#2a3a5c' }
+  ];
+
+  var rawAngles = items.map(function(item) { return item.val > 0 ? (item.val / total) * 2 * Math.PI : 0; });
+  var angles = rawAngles.map(function(a) { return a > 0 ? Math.max(a, MIN_ANGLE) : 0; });
+
+  var startAngle = -Math.PI / 2;
+  items.forEach(function(item, i) {
+    if (item.val === 0) return;
+    var angle = angles[i];
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, startAngle, startAngle + angle);
+    ctx.arc(cx, cy, innerRadius, startAngle + angle, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = item.color;
+    ctx.fill();
+    ctx.strokeStyle = '#0d111d';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    startAngle += angle;
+  });
+
+  // 中心文字
+  ctx.fillStyle = '#e0e8f0';
+  ctx.font = 'bold 20px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(total, cx, cy - 8);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px sans-serif';
+  ctx.fillText('总行数', cx, cy + 14);
+}
+
+// ====== 绘制噪声滤波折线图（用于处理后报告弹窗） ======
+function drawAfterReportNoise(canvas) {
+  if (!canvas) return;
+  var ni = getColIndex('noise_X');
+  if (ni < 0) return;
+  var startRow = 299, endRow = Math.min(500, currentRows.length);
+  var rawVals = [];
+  for (var i = startRow; i < endRow; i++) {
+    var v = parsedRows[i][ni];
+    if (!isNaN(v)) rawVals.push(v);
+  }
+  if (rawVals.length < 2) return;
+
+  var N = rawVals.length;
+  // 高斯滤波
+  var gaussKernel = [0.061, 0.242, 0.383, 0.242, 0.061];
+  var halfK = 2;
+  var filteredVals = rawVals.map(function(_, i) {
+    var sum = 0, weightSum = 0;
+    for (var j = -halfK; j <= halfK; j++) {
+      var idx = i + j;
+      if (idx >= 0 && idx < rawVals.length) {
+        sum += rawVals[idx] * gaussKernel[j + halfK];
+        weightSum += gaussKernel[j + halfK];
+      }
+    }
+    return weightSum > 0 ? sum / weightSum : rawVals[i];
+  });
+
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var parentRect = canvas.parentElement.getBoundingClientRect();
+  var w = parentRect.width - 8;
+  var h = parentRect.height - 8;
+  if (w < 10) w = 600;
+  if (h < 10) h = 200;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+
+  var padding = { top: 30, bottom: 25, left: 40, right: 20 };
+  var plotW = w - padding.left - padding.right;
+  var plotH = h - padding.top - padding.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(30,58,95,0.5)';
+  ctx.lineWidth = 0.5;
+  for (var i = 0; i <= 4; i++) {
+    var y = padding.top + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
+  }
+
+  var dataMin = Math.min.apply(null, rawVals);
+  var dataMax = Math.max.apply(null, rawVals);
+  var yPad = (dataMax - dataMin) * 0.1 || 1;
+  var yMin = dataMin - yPad, yRange = dataMax - dataMin + 2 * yPad;
+
+  function mapX(i) { return padding.left + (i / (N - 1)) * plotW; }
+  function mapY(y) { return padding.top + (1 - (y - yMin) / yRange) * plotH; }
+
+  // 原始信号
+  ctx.strokeStyle = 'rgba(148,163,184,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  rawVals.forEach(function(v, i) {
+    var px = mapX(i), py = mapY(v);
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  // 滤波后
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  filteredVals.forEach(function(v, i) {
+    var px = mapX(i), py = mapY(v);
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  // 图例
+  ctx.fillStyle = 'rgba(148,163,184,0.8)';
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillRect(padding.left + 5, padding.top + 5, 12, 2);
+  ctx.fillText('原始 noise_X', padding.left + 20, padding.top + 9);
+
+  ctx.fillStyle = '#22d3ee';
+  ctx.fillRect(padding.left + 130, padding.top + 5, 12, 2.5);
+  ctx.fillText('滤波后', padding.left + 145, padding.top + 9);
+
+  // 标题
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('噪声滤波', w / 2, padding.top - 8);
+
+  // Y轴
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (var i = 0; i <= 4; i++) {
+    var v = yMin + (yRange / 4) * (4 - i);
+    ctx.fillText(v.toFixed(1), padding.left - 5, padding.top + (plotH / 4) * i);
+  }
+}
+
+// ====== 绘制归一化折线图（用于处理后报告弹窗） ======
+function drawAfterReportNorm(canvas, dataSource, title) {
+  if (!canvas) return;
+  var dataArr = (dataSource === 'initial' && window._snapshotParsed) ? window._snapshotParsed : parsedRows;
+  var colPrefix = (dataSource === 'initial') ? '' : '';
+
+  var idxX = getColIndex('vibration_X');
+  var idxZ = getColIndex('vibration_Z');
+  var idxN = getColIndex('noise_X');
+  if (idxX < 0) idxX = getColIndex('vibration_X (归一化)');
+  if (idxZ < 0) idxZ = getColIndex('vibration_Z (归一化)');
+  if (idxN < 0) idxN = getColIndex('noise_X (归一化)');
+  if (idxX < 0 || idxZ < 0 || idxN < 0) return;
+
+  function getSeries(colIdx) {
+    var vals = [];
+    for (var r = 0; r < dataArr.length; r++) {
+      var v = dataArr[r][colIdx];
+      if (!isNaN(v)) vals.push(v);
+    }
+    return vals;
+  }
+
+  var series = [
+    { name: 'vibration_X', vals: getSeries(idxX), color: '#22d3ee' },
+    { name: 'vibration_Z', vals: getSeries(idxZ), color: '#f59e0b' },
+    { name: 'noise_X', vals: getSeries(idxN), color: '#c084fc' }
+  ];
+
+  var allVals = [];
+  series.forEach(function(s) { allVals = allVals.concat(s.vals); });
+  var globalMin = Math.min.apply(null, allVals);
+  var globalMax = Math.max.apply(null, allVals);
+  var globalRange = globalMax - globalMin || 1;
+
+  var N = dataArr.length;
+
+  var ctx = canvas.getContext('2d');
+  var dpr = window.devicePixelRatio || 1;
+  var parentRect = canvas.parentElement.getBoundingClientRect();
+  var w = parentRect.width - 8;
+  var h = parentRect.height - 20;
+  if (w < 10) w = 300;
+  if (h < 10) h = 200;
+  canvas.width = w * dpr;
+  canvas.height = h * dpr;
+  canvas.style.width = w + 'px';
+  canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+
+  var padding = { top: 30, bottom: 30, left: 45, right: 20 };
+  var plotW = w - padding.left - padding.right;
+  var plotH = h - padding.top - padding.bottom;
+
+  ctx.clearRect(0, 0, w, h);
+
+  // 网格
+  ctx.strokeStyle = 'rgba(30,58,95,0.5)';
+  ctx.lineWidth = 0.5;
+  for (var i = 0; i <= 4; i++) {
+    var y = padding.top + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke();
+  }
+
+  function drawSeries(colIdx, color, name) {
+    var vals = [];
+    for (var r = 0; r < dataArr.length; r++) {
+      var v = dataArr[r][colIdx];
+      if (!isNaN(v)) vals.push(v);
+    }
+    if (vals.length < 2) return;
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    var first = true;
+    var xIdx = 0;
+    for (var r = 0; r < dataArr.length; r++) {
+      var v = dataArr[r][colIdx];
+      if (isNaN(v)) continue;
+      var norm = (v - globalMin) / globalRange;
+      var px = padding.left + (xIdx / (vals.length - 1)) * plotW;
+      var py = padding.top + (1 - norm) * plotH;
+      if (first) { ctx.moveTo(px, py); first = false; }
+      else { ctx.lineTo(px, py); }
+      xIdx++;
+    }
+    ctx.stroke();
+  }
+
+  drawSeries(idxX, '#22d3ee', 'vibration_X');
+  drawSeries(idxZ, '#f59e0b', 'vibration_Z');
+  drawSeries(idxN, '#c084fc', 'noise_X');
+
+  // 图例
+  var legendItems = [
+    { name: 'vibration_X', color: '#22d3ee' },
+    { name: 'vibration_Z', color: '#f59e0b' },
+    { name: 'noise_X', color: '#c084fc' }
+  ];
+  ctx.font = '11px sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  var lx = padding.left + 5;
+  legendItems.forEach(function(item) {
+    ctx.fillStyle = item.color;
+    ctx.fillRect(lx, padding.top + 5, 12, 2.5);
+    ctx.fillText(item.name, lx + 15, padding.top + 7);
+    lx += ctx.measureText(item.name).width + 35;
+  });
+
+  // 标题
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText(title || (dataSource === 'initial' ? '归一化前（原始数据）' : '归一化后（[0,1]范围）'), w / 2, padding.top - 25);
+
+  // Y轴标签
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px sans-serif';
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  var yLabels = [0];
+  var step = globalMax / 4;
+  for (var i = 1; i <= 4; i++) {
+    var val = step * i;
+    if (val > globalMax + 0.001) break;
+    yLabels.push(val);
+  }
+  if (yLabels.length < 5) yLabels.push(globalMax);
+  yLabels.forEach(function(val, i) {
+    var v = val / (globalRange || 1);
+    var y = padding.top + (1 - v) * plotH;
+    var label = val.toFixed(2);
+    ctx.fillText(label, padding.left - 5, y);
+  });
+}
+
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.3.2");
+console.log("BroadTech System · 数据质量监控平台 v4.4.0");
 </script>
 </body>
 </html>
