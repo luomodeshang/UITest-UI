@@ -223,6 +223,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
     <div class="modal-body" id="modalBody">
       <div class="modal-canvas-wrap">
         <canvas id="modalCanvas"></canvas>
+        <div id="pieTooltip" style="display:none; position:fixed; background:rgba(0,0,0,0.85); color:#e0e8f0; padding:6px 12px; border-radius:6px; font-size:14px; pointer-events:none; z-index:10000; border:1px solid rgba(255,255,255,0.15);"></div>
       </div>
       <div id="modalLegendContainer" style="display:none; width:300px; flex-direction:column; justify-content:center; gap:6px; padding:4px;">
         <div class="legend-item" data-type="miss" style="display:none;font-size:0.8rem;color:#94a3b8;padding:2px 6px;"><span class="legend-dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle;"></span><span class="legend-label"></span><span class="legend-val" style="color:#e0e8f0;font-weight:600;margin-left:4px;"></span><span class="legend-pct" style="color:#64748b;margin-left:2px;"></span></div>
@@ -1202,6 +1203,58 @@ function drawAbnormalChart(targetCanvas) {
           el.style.padding = (2 * scale) + 'px ' + (6 * scale) + 'px';
         });
       }
+
+      // 弹窗模式：饼图鼠标悬浮显示数值
+      const tooltip = document.getElementById('pieTooltip');
+      if (!tooltip._bound) {
+        tooltip._bound = true;
+        const slices = [];
+        let sa = -Math.PI / 2;
+        items.forEach((item, i) => {
+          if (item.val === 0) return;
+          const angle = angles[i];
+          const pct = total > 0 ? (item.val / total * 100) : 0;
+          slices.push({ startAngle: sa, endAngle: sa + angle, label: item.label, val: item.val, pct: pct });
+          sa += angle;
+        });
+
+        canvas.addEventListener('mousemove', function(e) {
+          const rect2 = canvas.getBoundingClientRect();
+          const mx = e.clientX - rect2.left;
+          const my = e.clientY - rect2.top;
+          const dx = mx - cx;
+          const dy = my - cy;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist > radius || dist < innerRadius) {
+            tooltip.style.display = 'none';
+            return;
+          }
+          let angle2 = Math.atan2(dy, dx);
+          if (angle2 < -Math.PI / 2) angle2 += 2 * Math.PI;
+          let found = null;
+          for (const s of slices) {
+            let sa2 = s.startAngle;
+            let ea2 = s.endAngle;
+            if (angle2 >= sa2 && angle2 <= ea2) {
+              found = s;
+              break;
+            }
+          }
+          if (found) {
+            const pctStr = found.pct < 0.1 ? found.pct.toFixed(2) : found.pct.toFixed(1);
+            tooltip.innerHTML = found.label + ': ' + found.val + ' (' + pctStr + '%)';
+            tooltip.style.display = 'block';
+            tooltip.style.left = (e.clientX + 15) + 'px';
+            tooltip.style.top = (e.clientY - 10) + 'px';
+          } else {
+            tooltip.style.display = 'none';
+          }
+        });
+
+        canvas.addEventListener('mouseleave', function() {
+          tooltip.style.display = 'none';
+        });
+      }
     }
   }
 }
@@ -1606,11 +1659,21 @@ function drawNormChart(targetCanvas) {
   ctx.font = fs(10);
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-  const isNormalized = globalMin >= 0 && globalMax <= 1;
-  [0, 0.25, 0.5, 0.75, 1].forEach((v, i) => {
-    const y = padding.top + (plotH / 4) * i;
-    // 已归一化：0在下(1-v)，1在上(1-0)；原始数据：0在下(100)，100在上(0) 
-    const label = isNormalized ? (1 - v).toFixed(2) : (100 - v * 100).toFixed(0);
+  // 动态Y轴：0固定，终点随数据变化，中间均分
+  const yLabels = [0];
+  const step = globalMax / 4;
+  for (let i = 1; i <= 4; i++) {
+    const val = step * i;
+    if (val > globalMax + 0.001) break;
+    yLabels.push(val);
+  }
+  // 确保终点是 globalMax
+  if (yLabels.length < 5) yLabels.push(globalMax);
+
+  yLabels.forEach((val, i) => {
+    const v = val / (globalRange || 1);
+    const y = padding.top + (1 - v) * plotH;
+    const label = val.toFixed(2);
     ctx.fillText(label, padding.left - 5, y);
   });
 
