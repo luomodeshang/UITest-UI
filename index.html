@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.4.1</title>
+<title>BroadTech System · 数据质量监控平台 v4.4.2</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -127,8 +127,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
 .after-report-pie-title { text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px; }
 .after-report-pie-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
 .after-report-noise-box { flex:1; display:flex; flex-direction:column; background:#111827; border:1px solid #1e3a5f; border-radius:8px; overflow:hidden; padding:4px; }
-.after-report-noise-title { text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px; }
-.after-report-noise-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
+.after-report-noise-box canvas { flex:1; width:100%; height:100%; }
 .after-report-norm-box { flex:1; display:flex; flex-direction:column; background:#111827; border:1px solid #1e3a5f; border-radius:8px; overflow:hidden; padding:4px; position:relative; }
 .after-report-norm-title { text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px; }
 .after-report-norm-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
@@ -275,15 +274,10 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
           <canvas id="canvasFinalPie"></canvas>
         </div>
       </div>
-      <!-- 第二行：两个噪声滤波折线图并排 -->
+      <!-- 第二行：噪声滤波折线图 -->
       <div class="after-report-row">
         <div class="after-report-noise-box">
-          <div class="after-report-noise-title">原始噪声</div>
-          <canvas id="canvasNoiseRaw"></canvas>
-        </div>
-        <div class="after-report-noise-box">
-          <div class="after-report-noise-title">噪声滤波后</div>
-          <canvas id="canvasNoiseFiltered"></canvas>
+          <canvas id="canvasAfterNoise"></canvas>
         </div>
       </div>
       <!-- 第三行：两个归一化折线图并排 -->
@@ -2066,17 +2060,89 @@ function drawAfterReport() {
     window._snapshotParsed,
     '初始数据'
   );
-  drawAfterReportPie(
+  drawAfterReportPieFinal(
     document.getElementById('canvasFinalPie'),
-    currentHeaders,
-    currentRows,
-    parsedRows,
     '处理后数据'
   );
-  drawAfterReportNoiseRaw(document.getElementById('canvasNoiseRaw'));
-  drawAfterReportNoiseFiltered(document.getElementById('canvasNoiseFiltered'));
+  drawNoiseSignalFromSnapshot(document.getElementById('canvasAfterNoise'));
   drawAfterReportNorm(document.getElementById('canvasBeforeNorm'), 'initial', '归一化处理前');
   drawAfterReportNorm(document.getElementById('canvasAfterNorm'), 'after', '归一化处理后');
+}
+
+// ====== 绘制第二个饼图（使用全局变量，不重新检测） ======
+function drawAfterReportPieFinal(canvas, title) {
+  if (!canvas) return;
+  var dupCount = duplicateRows.length;
+  var missCount = missingPos.length;
+  var outCount = outlierPos.length;
+  var total = currentRows.length;
+  var normalCount = total > 0 ? total - dupCount - missCount - outCount : 0;
+
+  var items = [
+    { type: 'miss',  label: '缺失值',  val: missCount, color: '#10b981' },
+    { type: 'dup',  label: '重复值',  val: dupCount,  color: '#f59e0b' },
+    { type: 'outlier', label: '异常值', val: outCount,  color: '#a855f7' },
+    { type: 'normal', label: '正常',    val: normalCount, color: '#2a3a5c' }
+  ];
+
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  var dpr = window.devicePixelRatio || 1;
+  var w = canvas.parentElement.clientWidth || 300;
+  var h = canvas.parentElement.clientHeight - 20 || 280;
+  if (w < 10) w = 300; if (h < 10) h = 280;
+  canvas.width = w * dpr; canvas.height = h * dpr; canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  var cx = w / 2, cy = h / 2;
+  var radius = Math.min(w, h) / 2 - 15;
+  var innerRadius = 0;
+  var MIN_ANGLE = 0.087;
+  var rawAngles = items.map(function(item) { return item.val > 0 ? (item.val / total) * 2 * Math.PI : 0; });
+  var angles = rawAngles.map(function(a) { return a > 0 ? Math.max(a, MIN_ANGLE) : 0; });
+  var startAngle = -Math.PI / 2;
+  items.forEach(function(item, i) {
+    if (item.val === 0) return;
+    var angle = angles[i];
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, startAngle, startAngle + angle);
+    ctx.arc(cx, cy, innerRadius, startAngle + angle, startAngle, true);
+    ctx.closePath();
+    ctx.fillStyle = item.color;
+    ctx.fill();
+    ctx.strokeStyle = '#0d111d'; ctx.lineWidth = 1.5; ctx.stroke();
+    startAngle += angle;
+  });
+
+  // 中心文字
+  ctx.fillStyle = '#e0e8f0'; ctx.font = 'bold 20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(total, cx, cy - 8);
+  ctx.fillStyle = '#64748b'; ctx.font = '11px sans-serif';
+  ctx.fillText('总行数', cx, cy + 14);
+  // 标题
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(title || '处理后数据', w / 2, 14);
+}
+
+// ====== 用初始数据快照绘制噪声图（复用右侧面板逻辑） ======
+function drawNoiseSignalFromSnapshot(canvas) {
+  if (!canvas || !window._snapshotParsed || !window._snapshotHeaders) return;
+  // 临时用快照数据替换全局变量，调用 drawNoiseSignal，再恢复
+  var savedRows = currentRows;
+  var savedParsed = parsedRows;
+  var savedHeaders = currentHeaders;
+  currentRows = window._snapshotRows;
+  parsedRows = window._snapshotParsed;
+  currentHeaders = window._snapshotHeaders;
+  // 保存并临时修改 noiseFiltered 状态为 true（确保画出两条线）
+  var savedNoiseFlag = noiseFiltered;
+  noiseFiltered = true;
+  drawNoiseSignal(canvas);
+  noiseFiltered = savedNoiseFlag;
+  currentRows = savedRows;
+  parsedRows = savedParsed;
+  currentHeaders = savedHeaders;
 }
 
 // ====== 绘制单个饼图（用于处理后报告弹窗） ======
@@ -2194,117 +2260,7 @@ function drawAfterReportPie(canvas, headers, rows, parsed, title) {
   ctx.fillText('总行数', cx, cy + 14);
 }
 
-// ====== 绘制原始噪声折线图（用于处理后报告弹窗，只画原始曲线） ======
-function _noiseGetData() {
-  var ni = getColIndex('noise_X');
-  if (ni < 0) return null;
-  var startRow = 299, endRow = Math.min(500, currentRows.length);
-  var rawVals = [];
-  for (var i = startRow; i < endRow; i++) {
-    var v = parsedRows[i][ni];
-    if (!isNaN(v)) rawVals.push(v);
-  }
-  if (rawVals.length < 2) return null;
-  var gaussKernel = [0.061, 0.242, 0.383, 0.242, 0.061];
-  var halfK = 2;
-  var filteredVals = rawVals.map(function(_, i) {
-    var sum = 0, weightSum = 0;
-    for (var j = -halfK; j <= halfK; j++) {
-      var idx = i + j;
-      if (idx >= 0 && idx < rawVals.length) {
-        sum += rawVals[idx] * gaussKernel[j + halfK];
-        weightSum += gaussKernel[j + halfK];
-      }
-    }
-    return weightSum > 0 ? sum / weightSum : rawVals[i];
-  });
-  return { rawVals: rawVals, filteredVals: filteredVals, N: rawVals.length };
-}
 
-function drawAfterReportNoiseRaw(canvas) {
-  if (!canvas) return;
-  var data = _noiseGetData();
-  if (!data) return;
-  var ctx = canvas.getContext('2d');
-  var dpr = window.devicePixelRatio || 1;
-  var parentRect = canvas.parentElement.getBoundingClientRect();
-  var w = parentRect.width - 8;
-  var h = parentRect.height - 20;
-  if (w < 10) w = 300;
-  if (h < 10) h = 150;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  ctx.scale(dpr, dpr);
-
-  var padding = { top: 30, bottom: 25, left: 40, right: 20 };
-  var plotW = w - padding.left - padding.right;
-  var plotH = h - padding.top - padding.bottom;
-  ctx.clearRect(0, 0, w, h);
-  // 网格
-  ctx.strokeStyle = 'rgba(30,58,95,0.5)'; ctx.lineWidth = 0.5;
-  for (var i = 0; i <= 4; i++) { var y = padding.top + (plotH / 4) * i; ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke(); }
-  var dataMin = Math.min.apply(null, data.rawVals);
-  var dataMax = Math.max.apply(null, data.rawVals);
-  var yPad = (dataMax - dataMin) * 0.1 || 1;
-  var yMin = dataMin - yPad, yRange = dataMax - dataMin + 2 * yPad;
-  function mapX(i) { return padding.left + (i / (data.N - 1)) * plotW; }
-  function mapY(y) { return padding.top + (1 - (y - yMin) / yRange) * plotH; }
-  // 仅画原始信号
-  ctx.strokeStyle = 'rgba(148,163,184,0.5)'; ctx.lineWidth = 1.5; ctx.beginPath();
-  data.rawVals.forEach(function(v, i) { var px = mapX(i), py = mapY(v); i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); });
-  ctx.stroke();
-  // 图例
-  ctx.fillStyle = 'rgba(148,163,184,0.8)'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillRect(padding.left + 5, padding.top + 5, 12, 2); ctx.fillText('原始 noise_X', padding.left + 20, padding.top + 9);
-  // Y轴（基于原始数据范围）
-  ctx.fillStyle = '#64748b'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-  for (var i = 0; i <= 4; i++) { var v = yMin + (yRange / 4) * (4 - i); ctx.fillText(v.toFixed(1), padding.left - 5, padding.top + (plotH / 4) * i); }
-}
-
-function drawAfterReportNoiseFiltered(canvas) {
-  if (!canvas) return;
-  var data = _noiseGetData();
-  if (!data) return;
-  var ctx = canvas.getContext('2d');
-  var dpr = window.devicePixelRatio || 1;
-  var parentRect = canvas.parentElement.getBoundingClientRect();
-  var w = parentRect.width - 8;
-  var h = parentRect.height - 20;
-  if (w < 10) w = 300;
-  if (h < 10) h = 150;
-  canvas.width = w * dpr;
-  canvas.height = h * dpr;
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  ctx.scale(dpr, dpr);
-
-  var padding = { top: 30, bottom: 25, left: 40, right: 20 };
-  var plotW = w - padding.left - padding.right;
-  var plotH = h - padding.top - padding.bottom;
-  ctx.clearRect(0, 0, w, h);
-  // 网格
-  ctx.strokeStyle = 'rgba(30,58,95,0.5)'; ctx.lineWidth = 0.5;
-  for (var i = 0; i <= 4; i++) { var y = padding.top + (plotH / 4) * i; ctx.beginPath(); ctx.moveTo(padding.left, y); ctx.lineTo(w - padding.right, y); ctx.stroke(); }
-  // Y轴基于滤波后数据的范围
-  var fMin = Math.min.apply(null, data.filteredVals);
-  var fMax = Math.max.apply(null, data.filteredVals);
-  var fPad = (fMax - fMin) * 0.1 || 1;
-  var yMin = fMin - fPad, yRange = fMax - fMin + 2 * fPad;
-  function mapX(i) { return padding.left + (i / (data.N - 1)) * plotW; }
-  function mapY(y) { return padding.top + (1 - (y - yMin) / yRange) * plotH; }
-  // 仅画滤波后信号
-  ctx.strokeStyle = '#22d3ee'; ctx.lineWidth = 2.5; ctx.beginPath();
-  data.filteredVals.forEach(function(v, i) { var px = mapX(i), py = mapY(v); i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py); });
-  ctx.stroke();
-  // 图例
-  ctx.fillStyle = '#22d3ee'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
-  ctx.fillRect(padding.left + 5, padding.top + 5, 12, 2.5); ctx.fillText('滤波后', padding.left + 20, padding.top + 9);
-  // Y轴（基于滤波后数据范围）
-  ctx.fillStyle = '#64748b'; ctx.font = '10px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
-  for (var i = 0; i <= 4; i++) { var v = yMin + (yRange / 4) * (4 - i); ctx.fillText(v.toFixed(1), padding.left - 5, padding.top + (plotH / 4) * i); }
-}
 
 // ====== 绘制归一化折线图（用于处理后报告弹窗） ======
 function drawAfterReportNorm(canvas, dataSource, title) {
@@ -2409,12 +2365,17 @@ function drawAfterReportNorm(canvas, dataSource, title) {
   ctx.font = '11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
-  var lx = padding.left + 5;
-  legendItems.forEach(function(item) {
+  var totalWidth = w - padding.left - padding.right - 5;
+  var nameWidths = legendItems.map(function(item) { return ctx.measureText(item.name).width; });
+  var positions = [
+    padding.left + 5,
+    padding.left + 5 + totalWidth * 0.5 - nameWidths[1] / 2,
+    w - padding.right - nameWidths[2] - 15
+  ];
+  legendItems.forEach(function(item, i) {
     ctx.fillStyle = item.color;
-    ctx.fillRect(lx, padding.top + 5, 12, 2.5);
-    ctx.fillText(item.name, lx + 15, padding.top + 7);
-    lx += ctx.measureText(item.name).width + 35;
+    ctx.fillRect(positions[i], padding.top + 5, 12, 2.5);
+    ctx.fillText(item.name, positions[i] + 15, padding.top + 7);
   });
 
   // 标题
@@ -2445,7 +2406,7 @@ function drawAfterReportNorm(canvas, dataSource, title) {
 }
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.4.1");
+console.log("BroadTech System · 数据质量监控平台 v4.4.2");
 </script>
 </body>
 </html>
