@@ -108,8 +108,8 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
 .modal-header h3 { color:#e0e8f0; font-size:1.1rem; letter-spacing:2px; margin:0; border:none; padding:0; }
 .modal-close-btn { padding:8px 24px; border-radius:6px; font-size:14px; cursor:pointer; background:rgba(0,212,255,.12); border:1px solid #00d4ff; color:#00d4ff; transition:all .3s; }
 .modal-close-btn:hover { background:rgba(0,212,255,.3); }
-.modal-body { width:92%; flex:1; max-width:1400px; max-height:85vh; position:relative; display:flex; flex-direction:column; }
-.modal-body canvas { width:100%; flex:1; min-height:0; }
+.modal-body { width:92%; flex:1; max-width:1400px; max-height:85vh; position:relative; }
+.modal-body canvas { width:100%; height:100%; }
 
 .bottom-bar { height:44px; min-height:44px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#0f1729 0%,#1a2744 100%); border-top:1px solid #1e3a5f; }
 .bottom-bar__title { font-size:1.25rem; font-weight:600; color:#fff; letter-spacing:4px; }
@@ -221,7 +221,6 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
     </div>
     <div class="modal-body" id="modalBody">
       <canvas id="modalCanvas"></canvas>
-      <div id="modalLegend" style="display:none; color:#e0e8f0; font-size:13px; padding:10px 0; text-align:center; letter-spacing:1px;"></div>
     </div>
   </div>
 
@@ -1156,26 +1155,6 @@ function drawAbnormalChart(targetCanvas) {
   ctx.fillStyle = '#64748b';
   ctx.font = '11px sans-serif';
   ctx.fillText('总行数', cx, cy + 14);
-
-  // 弹窗模式：添加文字图例
-  if (targetCanvas) {
-    const legendEl = document.getElementById('modalLegend');
-    if (legendEl) {
-      const items = [
-        { label: '缺失值', pct: total > 0 ? (missCount/total*100) : 0, color: '#10b981' },
-        { label: '重复值', pct: total > 0 ? (dupCount/total*100) : 0, color: '#f59e0b' },
-        { label: '异常值', pct: total > 0 ? (outCount/total*100) : 0, color: '#a855f7' },
-        { label: '正常',   pct: total > 0 ? (normalCount/total*100) : 0, color: '#2a3a5c' }
-      ];
-      let html = '';
-      items.forEach(item => {
-        const pctStr = item.pct < 0.1 ? item.pct.toFixed(2) : item.pct.toFixed(1);
-        html += '<span style="margin:0 14px;"><span style="color:' + item.color + ';">●</span> ' + item.label + ' (' + pctStr + '%)</span>';
-      });
-      legendEl.innerHTML = html;
-      legendEl.style.display = 'block';
-    }
-  }
 }
 
 // ====== 时间预处理 ======
@@ -1300,10 +1279,7 @@ function drawNoiseSignal(targetCanvas) {
   ctx.scale(dpr, dpr);
 
   const w = canvas.width / dpr, h = canvas.height / dpr;
-  const modalScale = targetCanvas ? Math.min(w / 400, h / 250) : 1;
-  const fs = (n) => Math.round(n * modalScale) + 'px sans-serif';
-  const fsBold = (n) => 'bold ' + Math.round(n * modalScale) + 'px sans-serif';
-  const padding = { top: 30 * (targetCanvas ? modalScale : 1), bottom: 25 * (targetCanvas ? modalScale : 1), left: 40 * (targetCanvas ? modalScale : 1), right: 20 * (targetCanvas ? modalScale : 1) };
+  const padding = { top: 30, bottom: 25, left: 40, right: 20 };
   const plotW = w - padding.left - padding.right;
   const plotH = h - padding.top - padding.bottom;
 
@@ -1365,7 +1341,7 @@ function drawNoiseSignal(targetCanvas) {
 
   // 图例: 原始
   ctx.fillStyle = 'rgba(148,163,184,0.8)';
-  ctx.font = fs(11);
+  ctx.font = '11px sans-serif';
   ctx.textAlign = 'left';
   ctx.fillRect(padding.left + 5, padding.top + 5, 12, 2);
   ctx.fillText('原始 noise_X', padding.left + 20, padding.top + 9);
@@ -1382,24 +1358,24 @@ function drawNoiseSignal(targetCanvas) {
     ctx.stroke();
 
     ctx.fillStyle = '#22d3ee';
-    ctx.font = fsBold(11);
+    ctx.font = 'bold 11px sans-serif';
     ctx.fillRect(padding.left + 130, padding.top + 5, 12, 2.5);
     ctx.fillText('滤波后', padding.left + 145, padding.top + 9);
 
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.font = fs(10);
+    ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('噪声滤波 (高斯滤波, σ=1.5) - 已处理', w / 2, padding.top - 8);
   } else {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.font = fs(10);
+    ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('噪声滤波曲线', w / 2, padding.top - 8);
   }
 
   // Y轴
   ctx.fillStyle = '#64748b';
-  ctx.font = fs(10);
+  ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   for (let i = 0; i <= 4; i++) {
@@ -1448,10 +1424,7 @@ function drawNormChart(targetCanvas) {
   ctx.scale(dpr, dpr);
 
   const w = canvas.width / dpr, h = canvas.height / dpr;
-  const modalScale = targetCanvas ? Math.min(w / 400, h / 250) : 1;
-  const fs = (n) => Math.round(n * modalScale) + 'px sans-serif';
-  const fsBold = (n) => 'bold ' + Math.round(n * modalScale) + 'px sans-serif';
-  const padding = { top: 30 * (targetCanvas ? modalScale : 1), bottom: 30 * (targetCanvas ? modalScale : 1), left: 45 * (targetCanvas ? modalScale : 1), right: 20 * (targetCanvas ? modalScale : 1) };
+  const padding = { top: 30, bottom: 30, left: 45, right: 20 };
   const plotW = w - padding.left - padding.right;
   const plotH = h - padding.top - padding.bottom;
 
@@ -1541,7 +1514,7 @@ function drawNormChart(targetCanvas) {
     { name: 'noise_X', color: '#c084fc' }
   ];
   let lx = padding.left + 5;
-  ctx.font = fs(11);
+  ctx.font = '11px sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   legendItems.forEach(item => {
@@ -1553,13 +1526,13 @@ function drawNormChart(targetCanvas) {
 
   // 标题
   ctx.fillStyle = 'rgba(255,255,255,0.4)';
-  ctx.font = fs(10);
+  ctx.font = '10px sans-serif';
   ctx.textAlign = 'center';
   ctx.fillText('归一化处理', w / 2, padding.top - 8);
 
   // Y轴标签：数据已归一化显示[0,1]，否则显示0-100
   ctx.fillStyle = '#64748b';
-  ctx.font = fs(10);
+  ctx.font = '10px sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
   const isNormalized = globalMin >= 0 && globalMax <= 1;
@@ -1702,9 +1675,6 @@ function redrawModalChart() {
   modalCanvas.style.height = rect.height + 'px';
   
   // 调用对应绘图函数，传入 modalCanvas
-  // 非饼图时隐藏图例
-  const legendEl = document.getElementById('modalLegend');
-  if (legendEl && modalChartType !== 'abnormal') legendEl.style.display = 'none';
   if (modalChartType === 'abnormal') drawAbnormalChart(modalCanvas);
   else if (modalChartType === 'noise') drawNoiseSignal(modalCanvas);
   else if (modalChartType === 'norm') drawNormChart(modalCanvas);
@@ -1746,10 +1716,6 @@ window.addEventListener('resize', () => {
     if (STEP_FLAGS.imported && _btnQuality.classList.contains('active')) drawCharts();
   }, 300);
 });
-
-// ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.2.3");
-console.log("%c BroadTech System v4.2.3 ", "background:#0a0e17;color:#00d4ff;font-size:14px;padding:4px 8px;");
 </script>
 </body>
 </html>
