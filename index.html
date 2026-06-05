@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.1.13</title>
+<title>BroadTech System · 数据质量监控平台 v4.2.1</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -96,6 +96,21 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
 .chart-top { flex:1.5; }
 .chart-middle { flex:2; }
 .chart-bottom { flex:2; }
+/* 图表点击放大 */
+.chart-clickable { cursor:pointer; transition:border-color .3s; }
+.chart-clickable:hover { border-color:#00d4ff; }
+.chart-expand-hint { position:absolute; top:6px; right:8px; color:#2a3a5c; font-size:20px; opacity:0; transition:opacity .3s; pointer-events:none; z-index:1; }
+.chart-clickable:hover .chart-expand-hint { opacity:1; color:#00d4ff; }
+
+/* 放大弹窗 */
+.chart-modal { position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,.85); z-index:10000; display:none; flex-direction:column; align-items:center; justify-content:center; }
+.modal-header { display:flex; align-items:center; justify-content:space-between; width:92%; max-width:1400px; padding:12px 0; }
+.modal-header h3 { color:#e0e8f0; font-size:1.1rem; letter-spacing:2px; margin:0; border:none; padding:0; }
+.modal-close-btn { padding:8px 24px; border-radius:6px; font-size:14px; cursor:pointer; background:rgba(0,212,255,.12); border:1px solid #00d4ff; color:#00d4ff; transition:all .3s; }
+.modal-close-btn:hover { background:rgba(0,212,255,.3); }
+.modal-body { width:92%; flex:1; max-width:1400px; max-height:85vh; position:relative; }
+.modal-body canvas { width:100%; height:100%; }
+
 .bottom-bar { height:44px; min-height:44px; display:flex; align-items:center; justify-content:center; background:linear-gradient(135deg,#0f1729 0%,#1a2744 100%); border-top:1px solid #1e3a5f; }
 .bottom-bar__title { font-size:1.25rem; font-weight:600; color:#fff; letter-spacing:4px; }
 @keyframes scanline { 0% { transform:translateY(-100%); } 100% { transform:translateY(100vh); } }
@@ -168,7 +183,8 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
     <aside class="right-panel">
       <h3>▎数据质量报告</h3>
       <div class="chart-section">
-        <div class="chart-box chart-top" id="chartAbnormal">
+        <div class="chart-box chart-top chart-clickable" id="chartAbnormal" onclick="openChartModal('abnormal')">
+          <span class="chart-expand-hint">⛶</span>
           <div class="placeholder">异常分布<br><small>导入数据后显示</small></div>
           <div class="abnormal-layout" id="abnormalLayout" style="display:none;width:100%;height:100%;position:relative;">
             <div class="abnormal-pie" id="pieContainer" style="position:absolute;left:0;top:0;width:45%;height:100%;">
@@ -182,16 +198,30 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
             </div>
           </div>
         </div>
-        <div class="chart-box chart-middle" id="chartNoise">
+        <div class="chart-box chart-middle chart-clickable" id="chartNoise" onclick="openChartModal('noise')">
+          <span class="chart-expand-hint">⛶</span>
           <div class="placeholder">噪声滤波折线图<br><small>导入数据后显示</small></div>
           <canvas id="canvasNoise" style="display:none"></canvas>
         </div>
-        <div class="chart-box chart-bottom" id="chartNorm">
+        <div class="chart-box chart-bottom chart-clickable" id="chartNorm" onclick="openChartModal('norm')">
+          <span class="chart-expand-hint">⛶</span>
           <div class="placeholder">归一化处理<br><small>导入数据后显示</small></div>
           <canvas id="canvasNorm" style="display:none"></canvas>
         </div>
       </div>
     </aside>
+  </div>
+
+  
+  <!-- ===== 图表放大弹窗 ===== -->
+  <div class="chart-modal" id="chartModal">
+    <div class="modal-header">
+      <h3 id="modalTitle">图表</h3>
+      <button class="modal-close-btn" onclick="closeChartModal()">✕ 还原</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <canvas id="modalCanvas"></canvas>
+    </div>
   </div>
 
   <!-- ===== 底部 ===== -->
@@ -1025,7 +1055,7 @@ function checkExportReady() {
   _btnExport.disabled = !ready;
 }
 
-function drawAbnormalChart() {
+function drawAbnormalChart(targetCanvas) {
   const dupCount = duplicateRows.length;
   const missCount = missingPos.length;
   const outCount = outlierPos.length;
@@ -1059,13 +1089,13 @@ function drawAbnormalChart() {
   });
 
   // 绘制左侧环形图 + 连接线
-  const canvas = document.getElementById('canvasAbnormal');
-  const container = document.getElementById('pieContainer');
-  if (!canvas || !container) return;
+  const canvas = targetCanvas || document.getElementById('canvasAbnormal');
+  const container = targetCanvas ? null : document.getElementById('pieContainer');
+  if (!canvas) return;
 
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const rect = container.getBoundingClientRect();
+  const rect = (targetCanvas ? targetCanvas.parentElement : container).getBoundingClientRect();
   const w = rect.width, h = rect.height;
   canvas.width = w * dpr;
   canvas.height = h * dpr;
@@ -1228,17 +1258,20 @@ function stepTimePreprocess() {
 // ====== 噪声滤波图表 ======
 let noiseFiltered = false;
 
-function drawNoiseSignal() {
-  const canvas = document.getElementById('canvasNoise');
-  const container = document.getElementById('chartNoise');
-  if (!canvas || !container) return;
-  const placeholder = container.querySelector('.placeholder');
-  if (placeholder) placeholder.style.display = 'none';
+function drawNoiseSignal(targetCanvas) {
+  const canvas = targetCanvas || document.getElementById('canvasNoise');
+  if (!canvas) return;
+  if (!targetCanvas) {
+    const container = document.getElementById('chartNoise');
+    if (!container) return;
+    const placeholder = container.querySelector('.placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+  }
   canvas.style.display = 'block';
 
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const rect = container.getBoundingClientRect();
+  const rect = (targetCanvas ? targetCanvas.parentElement : document.getElementById('chartNoise')).getBoundingClientRect();
   canvas.width = (rect.width - 16) * dpr;
   canvas.height = (rect.height - 16) * dpr;
   canvas.style.width = (rect.width - 16) + 'px';
@@ -1370,17 +1403,20 @@ function stepNoiseFilter() {
 }
 
 // ====== 归一化三线图 ======
-function drawNormChart() {
-  const canvas = document.getElementById('canvasNorm');
-  const container = document.getElementById('chartNorm');
-  if (!canvas || !container) return;
-  const placeholder = container.querySelector('.placeholder');
-  if (placeholder) placeholder.style.display = 'none';
+function drawNormChart(targetCanvas) {
+  const canvas = targetCanvas || document.getElementById('canvasNorm');
+  if (!canvas) return;
+  if (!targetCanvas) {
+    const container = document.getElementById('chartNorm');
+    if (!container) return;
+    const placeholder = container.querySelector('.placeholder');
+    if (placeholder) placeholder.style.display = 'none';
+  }
   canvas.style.display = 'block';
 
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const rect = container.getBoundingClientRect();
+  const rect = (targetCanvas ? targetCanvas.parentElement : document.getElementById('chartNorm')).getBoundingClientRect();
   canvas.width = (rect.width - 16) * dpr;
   canvas.height = (rect.height - 16) * dpr;
   canvas.style.width = (rect.width - 16) + 'px';
@@ -1598,12 +1634,56 @@ function stepQualityReport() {
 }
 
 // ====== 图表重绘入口 ======
-function drawCharts() {
+function drawCharts(targetCanvas) {
   drawAbnormalChart();
   drawNoiseSignal();
   drawNormChart();
 }
 
+// ====== 图表放大功能 ======
+let modalChartType = null;
+
+function openChartModal(type) {
+  if (!STEP_FLAGS.imported) { alert('请先导入数据集'); return; }
+  
+  const titles = { abnormal: '异常分布', noise: '噪声滤波折线图', norm: '归一化处理' };
+  document.getElementById('modalTitle').textContent = titles[type] || '图表';
+  document.getElementById('chartModal').style.display = 'flex';
+  modalChartType = type;
+  
+  // 延迟等弹窗渲染完成
+  setTimeout(() => redrawModalChart(), 100);
+}
+
+function closeChartModal() {
+  document.getElementById('chartModal').style.display = 'none';
+  modalChartType = null;
+}
+
+function redrawModalChart() {
+  if (!modalChartType) return;
+  const modalCanvas = document.getElementById('modalCanvas');
+  const modalBody = document.getElementById('modalBody');
+  if (!modalCanvas || !modalBody) return;
+  
+  // 获取弹窗尺寸
+  const dpr = window.devicePixelRatio || 1;
+  const rect = modalBody.getBoundingClientRect();
+  modalCanvas.width = rect.width * dpr;
+  modalCanvas.height = rect.height * dpr;
+  modalCanvas.style.width = rect.width + 'px';
+  modalCanvas.style.height = rect.height + 'px';
+  
+  // 调用对应绘图函数，传入 modalCanvas
+  if (modalChartType === 'abnormal') drawAbnormalChart(modalCanvas);
+  else if (modalChartType === 'noise') drawNoiseSignal(modalCanvas);
+  else if (modalChartType === 'norm') drawNormChart(modalCanvas);
+}
+
+// 弹窗 resize
+window.addEventListener('resize', () => {
+  if (modalChartType) redrawModalChart();
+});
 // ====== 导出 ======
 function exportDataset() {
   if (_btnExport.disabled) { alert('请先完成所有步骤后再导出'); return; }
