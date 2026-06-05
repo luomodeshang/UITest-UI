@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.4.2</title>
+<title>BroadTech System · 数据质量监控平台 v4.4.3</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -127,7 +127,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
 .after-report-pie-title { text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px; }
 .after-report-pie-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
 .after-report-noise-box { flex:1; display:flex; flex-direction:column; background:#111827; border:1px solid #1e3a5f; border-radius:8px; overflow:hidden; padding:4px; }
-.after-report-noise-box canvas { flex:1; width:100%; height:100%; }
+.after-report-noise-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
 .after-report-norm-box { flex:1; display:flex; flex-direction:column; background:#111827; border:1px solid #1e3a5f; border-radius:8px; overflow:hidden; padding:4px; position:relative; }
 .after-report-norm-title { text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px; }
 .after-report-norm-box canvas { flex:1; width:100%; height:calc(100% - 20px); }
@@ -274,10 +274,15 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
           <canvas id="canvasFinalPie"></canvas>
         </div>
       </div>
-      <!-- 第二行：噪声滤波折线图 -->
+      <!-- 第二行：两个噪声滤波折线图并排 -->
       <div class="after-report-row">
         <div class="after-report-noise-box">
-          <canvas id="canvasAfterNoise"></canvas>
+          <div style="text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px;">数据质量报告时</div>
+          <canvas id="canvasNoiseBeforeFilter"></canvas>
+        </div>
+        <div class="after-report-noise-box">
+          <div style="text-align:center; color:#94a3b8; font-size:0.8rem; padding:4px 0 2px 0; letter-spacing:1px;">噪声滤波后</div>
+          <canvas id="canvasNoiseAfterFilter"></canvas>
         </div>
       </div>
       <!-- 第三行：两个归一化折线图并排 -->
@@ -2064,7 +2069,8 @@ function drawAfterReport() {
     document.getElementById('canvasFinalPie'),
     '处理后数据'
   );
-  drawNoiseSignalFromSnapshot(document.getElementById('canvasAfterNoise'));
+  drawNoiseSignalFromSnapshot(document.getElementById('canvasNoiseBeforeFilter'), false);
+  drawNoiseSignalFromSnapshot(document.getElementById('canvasNoiseAfterFilter'), true);
   drawAfterReportNorm(document.getElementById('canvasBeforeNorm'), 'initial', '归一化处理前');
   drawAfterReportNorm(document.getElementById('canvasAfterNorm'), 'after', '归一化处理后');
 }
@@ -2126,7 +2132,7 @@ function drawAfterReportPieFinal(canvas, title) {
 }
 
 // ====== 用初始数据快照绘制噪声图（复用右侧面板逻辑） ======
-function drawNoiseSignalFromSnapshot(canvas) {
+function drawNoiseSignalFromSnapshot(canvas, showFiltered) {
   if (!canvas || !window._snapshotParsed || !window._snapshotHeaders) return;
   // 临时用快照数据替换全局变量，调用 drawNoiseSignal，再恢复
   var savedRows = currentRows;
@@ -2135,9 +2141,8 @@ function drawNoiseSignalFromSnapshot(canvas) {
   currentRows = window._snapshotRows;
   parsedRows = window._snapshotParsed;
   currentHeaders = window._snapshotHeaders;
-  // 保存并临时修改 noiseFiltered 状态为 true（确保画出两条线）
   var savedNoiseFlag = noiseFiltered;
-  noiseFiltered = true;
+  noiseFiltered = showFiltered === true;
   drawNoiseSignal(canvas);
   noiseFiltered = savedNoiseFlag;
   currentRows = savedRows;
@@ -2406,7 +2411,7 @@ function drawAfterReportNorm(canvas, dataSource, title) {
 }
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.4.2");
+console.log("BroadTech System · 数据质量监控平台 v4.4.3");
 </script>
 </body>
 </html>
