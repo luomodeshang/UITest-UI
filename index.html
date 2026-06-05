@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.2.8</title>
+<title>BroadTech System · 数据质量监控平台 v4.2.9</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -713,6 +713,7 @@ function highlightMiss() {
 
     // 饼图对应数据清零
     drawAbnormalChart();
+    if (modalChartType === 'abnormal') redrawModalChart();
 
     _missStage = 2;
     STEP_FLAGS.missingProcessed = true;
@@ -858,6 +859,7 @@ function highlightDup() {
       }
     });
     drawAbnormalChart();
+    if (modalChartType === 'abnormal') redrawModalChart();
 
     // 显示原始和当前信息
     const dsId = _datasetSelect.value || '1';
@@ -1400,6 +1402,7 @@ function drawNoiseSignal(targetCanvas) {
   if (rawVals.length < 2) return;
 
   const N = rawVals.length;
+  if (targetCanvas) _modalLineData = { type: 'noise', N, mapX: mapX.toString(), mapY: mapY.toString(), yMin, yRange, rawVals: rawVals.slice(), filteredVals: noiseFiltered ? filteredVals.slice() : null };
 
   // 高斯滤波（窗口=5, σ=1.5）
   const gaussKernel = [0.061, 0.242, 0.383, 0.242, 0.061];
@@ -1444,12 +1447,44 @@ function drawNoiseSignal(targetCanvas) {
   });
   ctx.stroke();
 
-  // 图例: 原始
-  ctx.fillStyle = 'rgba(148,163,184,0.8)';
-  ctx.font = fs(11);
-  ctx.textAlign = 'left';
-  ctx.fillRect(padding.left + 5, padding.top + 5, 12, 2);
-  ctx.fillText('原始 noise_X', padding.left + 20, padding.top + 9);
+  // 图例
+  if (targetCanvas) {
+    // 弹窗模式：两端对齐
+    const lItems = [
+      { name: '原始 noise_X', color: 'rgba(148,163,184,0.8)' },
+    ];
+    if (noiseFiltered) {
+      lItems.push({ name: '滤波后', color: '#22d3ee' });
+    }
+    ctx.font = fs(11);
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    const totalW = w - padding.left - padding.right - 5;
+    const nameWs = lItems.map(item => ctx.measureText(item.name).width);
+    if (lItems.length === 1) {
+      // 单条图例：居中
+      ctx.fillStyle = lItems[0].color;
+      ctx.fillRect(padding.left + 5, padding.top + 5, 12, 2.5);
+      ctx.fillText(lItems[0].name, padding.left + 20, padding.top + 7);
+    } else {
+      const positions = [
+        padding.left + 5,
+        w - padding.right - 20 - nameWs[1]
+      ];
+      lItems.forEach((item, i) => {
+        ctx.fillStyle = item.color;
+        ctx.fillRect(positions[i], padding.top + 5, 12, 2.5);
+        ctx.fillText(item.name, positions[i] + 15, padding.top + 7);
+      });
+    }
+  } else {
+    // 非弹窗模式：原始样式
+    ctx.fillStyle = 'rgba(148,163,184,0.8)';
+    ctx.font = fs(11);
+    ctx.textAlign = 'left';
+    ctx.fillRect(padding.left + 5, padding.top + 5, 12, 2);
+    ctx.fillText('原始 noise_X', padding.left + 20, padding.top + 9);
+  }
 
   if (noiseFiltered) {
     // 滤波后
@@ -1462,15 +1497,17 @@ function drawNoiseSignal(targetCanvas) {
     });
     ctx.stroke();
 
-    ctx.fillStyle = '#22d3ee';
-    ctx.font = fsBold(11);
-    ctx.fillRect(padding.left + 130, padding.top + 5, 12, 2.5);
-    ctx.fillText('滤波后', padding.left + 145, padding.top + 9);
+    if (!targetCanvas) {
+      ctx.fillStyle = '#22d3ee';
+      ctx.font = fsBold(11);
+      ctx.fillRect(padding.left + 130, padding.top + 5, 12, 2.5);
+      ctx.fillText('滤波后', padding.left + 145, padding.top + 9);
+    }
 
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = fs(10);
     ctx.textAlign = 'center';
-    ctx.fillText('噪声滤波 (高斯滤波, σ=1.5) - 已处理', w / 2, padding.top - 8);
+    ctx.fillText('噪声滤波 (高斯滤波, σ=1.5)', w / 2, padding.top - 8);
   } else {
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = fs(10);
@@ -1554,6 +1591,8 @@ function drawNormChart(targetCanvas) {
   if (idxZ < 0) idxZ = getColIndex('vibration_Z (归一化)');
   if (idxN < 0) idxN = getColIndex('noise_X (归一化)');
   if (idxX < 0 || idxZ < 0 || idxN < 0) return;
+
+  if (targetCanvas) _modalLineData = { type: 'norm', N, globalMin, globalRange, series: series.map(s => ({name: s.name, color: s.color, vals: s.vals.slice()})) };
 
   function getSeries(colIdx) {
     const vals = [];
@@ -1776,6 +1815,7 @@ function drawCharts(targetCanvas) {
 
 // ====== 图表放大功能 ======
 let modalChartType = null;
+let _modalLineData = null; // {type, points, mapX, mapY, yMin, yRange, series, globalMin, globalMax, N}
 
 function openChartModal(type) {
   if (!STEP_FLAGS.imported) { alert('请先导入数据集'); return; }
@@ -1787,6 +1827,74 @@ function openChartModal(type) {
   
   // 延迟等弹窗渲染完成
   setTimeout(() => redrawModalChart(), 100);
+}
+
+function _bindLineTooltip(canvas) {
+  if (!canvas || !_modalLineData) return;
+  const tooltip = document.getElementById('pieTooltip');
+  if (!tooltip) return;
+  // Remove old listener
+  const oldHandler = canvas._lineTooltipHandler;
+  if (oldHandler) canvas.removeEventListener('mousemove', oldHandler);
+  const oldLeave = canvas._lineTooltipLeave;
+  if (oldLeave) canvas.removeEventListener('mouseleave', oldLeave);
+
+  const handler = function(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const dpr = window.devicePixelRatio || 1;
+    const w = canvas.width / dpr;
+    const h = canvas.height / dpr;
+    const data = _modalLineData;
+    if (!data) { tooltip.style.display = 'none'; return; }
+
+    if (data.type === 'noise') {
+      // 噪声滤波
+      const padding = { top: 30, bottom: 25, left: 40, right: 20 };
+      const plotW = w - padding.left - padding.right;
+      const plotH = h - padding.top - padding.bottom;
+      if (mx < padding.left || mx > w - padding.right) { tooltip.style.display = 'none'; return; }
+      const idx = Math.round((mx - padding.left) / plotW * (data.rawVals.length - 1));
+      if (idx < 0 || idx >= data.rawVals.length) { tooltip.style.display = 'none'; return; }
+      const rawV = data.rawVals[idx];
+      let tip = '原始 noise_X: ' + rawV.toFixed(4);
+      if (data.filteredVals && idx < data.filteredVals.length) {
+        tip += '<br>滤波后: ' + data.filteredVals[idx].toFixed(4);
+      }
+      tooltip.innerHTML = tip;
+      tooltip.style.display = 'block';
+      tooltip.style.left = (e.clientX + 15) + 'px';
+      tooltip.style.top = (e.clientY - 10) + 'px';
+    } else if (data.type === 'norm') {
+      // 归一化
+      const padding = { top: 30, bottom: 30, left: 45, right: 20 };
+      const plotW = w - padding.left - padding.right;
+      const plotH = h - padding.top - padding.bottom;
+      if (mx < padding.left || mx > w - padding.right) { tooltip.style.display = 'none'; return; }
+      let tip = '';
+      data.series.forEach(s => {
+        const idx = Math.round((mx - padding.left) / plotW * (s.vals.length - 1));
+        if (idx >= 0 && idx < s.vals.length) {
+          const v = s.vals[idx];
+          const normV = (v - data.globalMin) / data.globalRange;
+          tip += '<span style="color:' + s.color + '">' + s.name + ': ' + v.toFixed(4) + ' (' + normV.toFixed(3) + ')</span><br>';
+        }
+      });
+      if (tip) {
+        tooltip.innerHTML = tip;
+        tooltip.style.display = 'block';
+        tooltip.style.left = (e.clientX + 15) + 'px';
+        tooltip.style.top = (e.clientY - 10) + 'px';
+      } else {
+        tooltip.style.display = 'none';
+      }
+    }
+  };
+  const leaveHandler = function() { tooltip.style.display = 'none'; };
+  canvas._lineTooltipHandler = handler;
+  canvas._lineTooltipLeave = leaveHandler;
+  canvas.addEventListener('mousemove', handler);
+  canvas.addEventListener('mouseleave', leaveHandler);
 }
 
 function closeChartModal() {
@@ -1812,9 +1920,14 @@ function redrawModalChart() {
   // 非饼图时隐藏图例
   const legendContainer = document.getElementById('modalLegendContainer');
   if (legendContainer && modalChartType !== 'abnormal') legendContainer.style.display = 'none';
-  if (modalChartType === 'abnormal') drawAbnormalChart(modalCanvas);
-  else if (modalChartType === 'noise') drawNoiseSignal(modalCanvas);
-  else if (modalChartType === 'norm') drawNormChart(modalCanvas);
+  if (modalChartType === 'abnormal') {
+    drawAbnormalChart(modalCanvas);
+  } else if (modalChartType === 'noise' || modalChartType === 'norm') {
+    if (modalChartType === 'noise') drawNoiseSignal(modalCanvas);
+    else drawNormChart(modalCanvas);
+    // 折线图tooltip
+    _bindLineTooltip(modalCanvas);
+  }
 }
 
 // 弹窗 resize
@@ -1855,7 +1968,7 @@ window.addEventListener('resize', () => {
 });
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.2.8");
+console.log("BroadTech System · 数据质量监控平台 v4.2.9");
 </script>
 </body>
 </html>
