@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.4.6</title>
+<title>BroadTech System · 数据质量监控平台 v4.4.7</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -270,7 +270,7 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
           <canvas id="canvasInitPie"></canvas>
         </div>
         <div class="after-report-pie-box">
-          
+          <div class="after-report-pie-title">处理后数据</div>
           <canvas id="canvasFinalPie"></canvas>
         </div>
       </div>
@@ -1608,10 +1608,10 @@ function drawNoiseSignal(targetCanvas) {
 }
 
 function stepNoiseFilter() {
-  // v4.4.6: 保存噪声滤波时数据快照，供处理后报告使用
-  window._noiseSnapshotRows = currentRows.slice();
-  window._noiseSnapshotParsed = parsedRows.slice();
-  window._noiseSnapshotHeaders = currentHeaders.slice();
+  // v4.4.7: 保存噪声滤波时数据快照（深拷贝，不受后续归一化修改影响）
+  window._noiseSnapshotRows = currentRows.map(r => [...r]);
+  window._noiseSnapshotParsed = parsedRows.map(r => [...r]);
+  window._noiseSnapshotHeaders = [...currentHeaders];
   noiseFiltered = true;
   drawNoiseSignal();
   STEP_FLAGS.noiseFiltered = true;
@@ -2134,10 +2134,8 @@ function drawAfterReportPieFinal(canvas, title) {
   ctx.fillText(total, cx, cy - 8);
   ctx.fillStyle = '#64748b'; ctx.font = '11px sans-serif';
   ctx.fillText('总行数', cx, cy + 14);
-  // 标题
-  ctx.fillStyle = 'rgba(255,255,255,0.4)'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(title || '处理后数据', w / 2, 14);
 }
+
 
 // ====== 用初始数据快照绘制噪声图（复用右侧面板逻辑） ======
 function drawNoiseSignalFromSnapshot(canvas, showFiltered) {
@@ -2437,7 +2435,7 @@ function drawAfterReportNorm(canvas, dataSource, title) {
 }
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.4.6");
+console.log("BroadTech System · 数据质量监控平台 v4.4.7");
 </script>
 </body>
 </html>
