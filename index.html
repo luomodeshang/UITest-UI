@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.4.5</title>
+<title>BroadTech System · 数据质量监控平台 v4.4.6</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -1608,6 +1608,10 @@ function drawNoiseSignal(targetCanvas) {
 }
 
 function stepNoiseFilter() {
+  // v4.4.6: 保存噪声滤波时数据快照，供处理后报告使用
+  window._noiseSnapshotRows = currentRows.slice();
+  window._noiseSnapshotParsed = parsedRows.slice();
+  window._noiseSnapshotHeaders = currentHeaders.slice();
   noiseFiltered = true;
   drawNoiseSignal();
   STEP_FLAGS.noiseFiltered = true;
@@ -2074,7 +2078,7 @@ function drawAfterReport() {
     '处理后数据'
   );
   drawNoiseSignalFromSnapshot(document.getElementById('canvasNoiseBeforeFilter'), false);
-  drawNoiseSignal(document.getElementById("canvasNoiseAfterFilter"));
+  drawNoiseSignalFromNoiseSnapshot(document.getElementById("canvasNoiseAfterFilter"));
   drawAfterReportNorm(document.getElementById('canvasBeforeNorm'), 'initial', '归一化处理前');
   drawAfterReportNorm(document.getElementById('canvasAfterNorm'), 'after', '归一化处理后');
 }
@@ -2147,6 +2151,24 @@ function drawNoiseSignalFromSnapshot(canvas, showFiltered) {
   currentHeaders = window._snapshotHeaders;
   var savedNoiseFlag = noiseFiltered;
   noiseFiltered = showFiltered === true;
+  drawNoiseSignal(canvas);
+  noiseFiltered = savedNoiseFlag;
+  currentRows = savedRows;
+  parsedRows = savedParsed;
+  currentHeaders = savedHeaders;
+}
+
+// ====== 用噪声滤波时的数据快照绘制噪声图（用于处理后报告） ======
+function drawNoiseSignalFromNoiseSnapshot(canvas) {
+  if (!canvas || !window._noiseSnapshotParsed || !window._noiseSnapshotHeaders) return;
+  var savedRows = currentRows;
+  var savedParsed = parsedRows;
+  var savedHeaders = currentHeaders;
+  currentRows = window._noiseSnapshotRows;
+  parsedRows = window._noiseSnapshotParsed;
+  currentHeaders = window._noiseSnapshotHeaders;
+  var savedNoiseFlag = noiseFiltered;
+  noiseFiltered = true;
   drawNoiseSignal(canvas);
   noiseFiltered = savedNoiseFlag;
   currentRows = savedRows;
@@ -2415,7 +2437,7 @@ function drawAfterReportNorm(canvas, dataSource, title) {
 }
 
 // ====== 输出版本信息 ======
-console.log("BroadTech System · 数据质量监控平台 v4.4.5");
+console.log("BroadTech System · 数据质量监控平台 v4.4.6");
 </script>
 </body>
 </html>

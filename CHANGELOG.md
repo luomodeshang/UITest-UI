@@ -1,3 +1,8 @@
+v4.4.6 (2026-06-08)
+- 修复：处理后报告右边噪声图固定使用点击噪声滤波时刻的数据，不受后续归一化影响
+- stepNoiseFilter 保存数据快照(_noiseSnapshotRows/Parsed/Headers)
+- 新增 drawNoiseSignalFromNoiseSnapshot 使用噪声快照绘制
+
 v4.4.5 (2026-06-08)
 - 处理后报告：第一行右边饼图只保留画布内标题，去掉HTML冗余标题
 - 第二行噪声图标题改为「噪声滤波处理前」「噪声滤波处理后」，去掉画布内重复标题
