@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>BroadTech System · 数据质量监控平台 v4.5.0</title>
+<title>BroadTech System · 数据质量监控平台 v4.5.1</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
 html,body { height:100%; overflow:hidden; }
@@ -13,8 +13,9 @@ body { background:#0a0e17; color:#e0e8f0; font-family:'Microsoft YaHei','PingFan
 ::-webkit-scrollbar-thumb { background:#2a3a5c; border-radius:3px; }
 ::-webkit-scrollbar-corner { background:#111827; }
 .app { height:100vh; display:flex; flex-direction:column; }
-.top-bar { height:60px; min-height:60px; display:flex; align-items:center; justify-content:flex-start; background:linear-gradient(135deg,#0f1729 0%,#1a2744 100%); border-bottom:1px solid #1e3a5f; padding:0 24px; }
-.top-bar__brand { display:flex; align-items:center; margin-left:auto; margin-right:60px; }
+.top-bar { height:60px; min-height:60px; display:flex; align-items:center; justify-content:space-between; background:linear-gradient(135deg,#0f1729 0%,#1a2744 100%); border-bottom:1px solid #1e3a5f; padding:0 24px; position:relative; }
+.top-bar__brand { display:flex; align-items:center; }
+.top-bar__title { font-size:1.05rem; color:#94a3b8; letter-spacing:3px; text-shadow:0 0 20px rgba(0,212,255,.15); }
 .top-bar__icon { display:block; height:50px; width:auto; filter:invert(1) brightness(0.8); }
 .top-bar::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; background:linear-gradient(90deg,transparent 0%,#00d4ff 50%,transparent 100%); opacity:.6; }
 .mid-area { flex:1; display:flex; overflow:hidden; background:#0d111d; }
@@ -157,6 +158,8 @@ td.outlier { background:rgba(168,85,247,.3) !important; color:#c084fc; }
     <div class="top-bar__brand">
       <img src="assets/images/BK-logo-black.png" class="top-bar__icon" alt="BK">
     </div>
+    <div class="top-bar__title">数据清洗生产线</div>
+    <div></div>
   </header>
 
   <!-- ===== 中间 ===== -->
